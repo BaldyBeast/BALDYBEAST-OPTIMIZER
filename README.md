@@ -31,6 +31,12 @@ Or clone the repo and run the file directly:
 powershell -ExecutionPolicy Bypass -File Optimize.ps1
 ```
 
+## What's new in v1.9.1
+
+- **Fixed**: live monitor output overwrote the reports from the Deep Reports
+  buttons within a second. The live feed now has its own box under the chart,
+  and reports stay in the Report Output box until you run another one.
+
 ## What's new in v1.9
 
 - **Event log forensics**: scans 48 hours of System and Application logs for

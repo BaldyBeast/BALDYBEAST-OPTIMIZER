@@ -12,7 +12,7 @@
 
 $ErrorActionPreference = 'Continue'
 
-$script:AppVersion   = '1.9.0'
+$script:AppVersion   = '1.9.1'
 $script:RepoRawUrl   = 'https://raw.githubusercontent.com/BaldyBeast/BALDYBEAST-OPTIMIZER/main/Optimize.ps1'
 $script:LogFile      = Join-Path $env:TEMP 'BaldyBeast-Optimizer.log'
 $script:LogBox       = $null
@@ -1086,6 +1086,18 @@ $xamlB = @'
                 <TextBlock Style="{StaticResource DimText}"
                            Text="Latency chart: last 90 samples of the packet loss monitor. Red marks are lost packets."/>
                 <Canvas x:Name="chartLatency" Height="90" Background="#FF0D0D14"/>
+                <TextBox x:Name="txtMonitor" IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap"
+                         FontFamily="Consolas" FontSize="12" Background="#FF0D0D14" Foreground="#FF9FE8B0"
+                         BorderBrush="#FF3A3A52" Padding="10" MinHeight="80" Margin="0,6,0,0"
+                         VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"/>
+              </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource Card}">
+              <StackPanel>
+                <TextBlock Style="{StaticResource CardHeader}" Text="Report Output"/>
+                <TextBlock Style="{StaticResource DimText}"
+                           Text="Reports from the buttons below stay here until you run another report."/>
                 <TextBox x:Name="txtDiag" IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap"
                          FontFamily="Consolas" FontSize="12" Background="#FF0D0D14" Foreground="#FFB8D8F0"
                          BorderBrush="#FF3A3A52" Padding="10" MinHeight="250"
@@ -3630,9 +3642,14 @@ function Sync-MonitorUi {
 
     $txtMonitorStatus.Text = [string]$state.MonitorText
 
+    # Live feed goes to its own box so it never overwrites reports in txtDiag
     $display = [string]$state.DisplayText
-    if ($display -and ($state.Stutter -or $state.Ping) -and $txtDiag.Text -ne $display) {
-        $txtDiag.Text = $display
+    if ($state.Stutter -or $state.Ping) {
+        if ($display -and $txtMonitor.Text -ne $display) {
+            $txtMonitor.Text = $display
+        }
+    } elseif ($txtMonitor.Text -ne 'Monitors idle. Tick Stutter watch or Packet loss monitor to start.') {
+        $txtMonitor.Text = 'Monitors idle. Tick Stutter watch or Packet loss monitor to start.'
     }
 
     Draw-LatencyChart
@@ -4331,7 +4348,7 @@ $controlNames = @(
     'chkTrayMode', 'chkGameDetect', 'txtPresetUrl', 'btnPresetImport',
     'txtDiag', 'chkStutterWatch', 'chkPingWatch', 'btnBottleneck', 'btnHealthCheck', 'btnDiagClear',
     'btnRunSfc', 'btnRunDism', 'btnRunRepairBoth',
-    'chartLatency', 'btnEventScan', 'btnDriverReport', 'btnStorageDeep', 'btnTopHogs', 'btnTimerRes',
+    'chartLatency', 'txtMonitor', 'btnEventScan', 'btnDriverReport', 'btnStorageDeep', 'btnTopHogs', 'btnTimerRes',
     'btnThrottleTest', 'btnDnsRace', 'txtPingTarget', 'btnPingAdd', 'txtPingTargets'
 )
 
@@ -4693,6 +4710,7 @@ $btnBottleneck.Add_Click({ Invoke-BottleneckScan })
 $btnHealthCheck.Add_Click({ Invoke-SystemHealthCheck })
 $btnDiagClear.Add_Click({
     Reset-DiagStats
+    $txtMonitor.Text = ''
     $txtDiag.Text = ''
 })
 $btnRunSfc.Add_Click({
