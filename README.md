@@ -26,6 +26,24 @@ Or clone the repo and run the file directly:
 powershell -ExecutionPolicy Bypass -File Optimize.ps1
 ```
 
+## What's new in v1.5
+
+- **Fresh Install Kit (Apps tab)**: tick a curated essentials list (browsers,
+  Steam, Epic, Discord, 7-Zip, PowerToys, VLC, OBS, VC++ runtimes) and install
+  everything in one winget batch. Nothing bundled, installs come from the
+  publishers.
+- **Per-game tuning (Games tab)**: auto-detects Steam games (or add any exe),
+  then per game forces the high performance GPU and disables fullscreen
+  optimizations. Current flags are shown when you select a game.
+- **Windows Update control**: defer updates 7/14/30 days, block driver updates
+  through Windows Update, never auto-restart while signed in.
+- **Power plan editor**: CPU min/max state, PCIe power saving and display off
+  timeout written to your active plan.
+- **Standby monitor**: opt-in auto-purge of the standby list when free RAM drops
+  under a threshold, active only while the tool is open.
+- **Dry-run preview**: bloatware removal now shows the exact package list before
+  deleting anything.
+
 ## What's new in v1.4
 
 - **Continuous integration**: every push runs the full validation harness (10

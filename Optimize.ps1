@@ -12,7 +12,7 @@
 
 $ErrorActionPreference = 'Continue'
 
-$script:AppVersion   = '1.4.0'
+$script:AppVersion   = '1.5.0'
 $script:RepoRawUrl   = 'https://raw.githubusercontent.com/BaldyBeast/BALDYBEAST-OPTIMIZER/main/Optimize.ps1'
 $script:LogFile      = Join-Path $env:TEMP 'BaldyBeast-Optimizer.log'
 $script:LogBox       = $null
@@ -461,6 +461,40 @@ $xamlA = @'
               </StackPanel>
             </Border>
 
+            <Border Style="{StaticResource Card}">
+              <StackPanel>
+                <TextBlock Style="{StaticResource CardHeader}" Text="Custom Power Plan (active plan)"/>
+                <TextBlock Style="{StaticResource DimText}"
+                           Text="Fine tune the power plan you are on right now. CPU min at 100 percent keeps clocks high for lowest input lag, at the cost of idle power."/>
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
+                  <TextBlock Text="CPU min state %" Width="150" VerticalAlignment="Center" Foreground="#FFE8E8F0"/>
+                  <Slider x:Name="sldCpuMin" Width="260" Minimum="0" Maximum="100" Value="100"
+                          TickFrequency="5" IsSnapToTickEnabled="True" VerticalAlignment="Center"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
+                  <TextBlock Text="CPU max state %" Width="150" VerticalAlignment="Center" Foreground="#FFE8E8F0"/>
+                  <Slider x:Name="sldCpuMax" Width="260" Minimum="5" Maximum="100" Value="100"
+                          TickFrequency="5" IsSnapToTickEnabled="True" VerticalAlignment="Center"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
+                  <TextBlock Text="PCIe power saving" Width="150" VerticalAlignment="Center" Foreground="#FFE8E8F0"/>
+                  <ComboBox x:Name="cmbPcie" Width="200" Padding="7" FontSize="13"
+                            Background="#FF0D0D14" Foreground="#FFE8E8F0" BorderBrush="#FF3A3A52">
+                    <ComboBoxItem Content="Off (best latency)" IsSelected="True"/>
+                    <ComboBoxItem Content="Moderate"/>
+                    <ComboBoxItem Content="Maximum power savings"/>
+                  </ComboBox>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                  <TextBlock Text="Display off after (min)" Width="150" VerticalAlignment="Center" Foreground="#FFE8E8F0"/>
+                  <Slider x:Name="sldDisplayOff" Width="260" Minimum="0" Maximum="60" Value="0"
+                          TickFrequency="5" IsSnapToTickEnabled="True" VerticalAlignment="Center"/>
+                </StackPanel>
+                <Button x:Name="btnApplyPower" Style="{StaticResource AccentButton}" Content="Apply to Active Power Plan"
+                        HorizontalAlignment="Left" Margin="0,4,0,0"/>
+              </StackPanel>
+            </Border>
+
             <Button x:Name="btnApplyGaming" Style="{StaticResource AccentButton}"
                     Content="Apply Selected Gaming Tweaks" HorizontalAlignment="Left" Margin="0,4,0,14"/>
           </StackPanel>
@@ -619,6 +653,16 @@ $xamlB = @'
                   <Button x:Name="btnPurgeStandby" Style="{StaticResource DangerButton}" Content="Purge Standby List" Margin="0,0,8,8"/>
                   <Button x:Name="btnMemoryRefresh" Style="{StaticResource DarkButton}" Content="Refresh Memory Info" Margin="0,0,8,8"/>
                 </WrapPanel>
+                <StackPanel Margin="0,8,0,0">
+                  <CheckBox x:Name="chkMonitorEnable" Style="{StaticResource DarkCheck}"
+                            Content="Auto-purge standby list while this tool is open"/>
+                  <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="Purge when free RAM under (MB)" Width="190" VerticalAlignment="Center" Foreground="#FFE8E8F0"/>
+                    <Slider x:Name="sldMonitorThreshold" Width="220" Minimum="500" Maximum="8000" Value="3000"
+                            TickFrequency="500" IsSnapToTickEnabled="True" VerticalAlignment="Center"/>
+                  </StackPanel>
+                  <TextBlock x:Name="txtMonitorStatus" Style="{StaticResource DimText}" Text="Monitor idle."/>
+                </StackPanel>
                 <TextBox x:Name="txtMemory" IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap"
                          FontFamily="Consolas" FontSize="12" Background="#FF0D0D14" Foreground="#FFB8D8F0"
                          BorderBrush="#FF3A3A52" Padding="10" MinHeight="230" Margin="0,6,0,0"
@@ -821,6 +865,101 @@ $xamlB = @'
                 <TextBlock Style="{StaticResource DimText}"
                            Text="Many gaming monitors run at 60 Hz out of the box even when they support 144 Hz or more. Check Display settings, open Advanced display, and pick the highest refresh rate your monitor offers. This is one of the biggest free wins for smoothness and it takes ten seconds."/>
                 <Button x:Name="btnOpenDisplay" Style="{StaticResource DarkButton}" Content="Open Display Settings" HorizontalAlignment="Left"/>
+              </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource Card}">
+              <StackPanel>
+                <TextBlock Style="{StaticResource CardHeader}" Text="Windows Update Control"/>
+                <TextBlock Style="{StaticResource DimText}"
+                           Text="Defer updates so a bad patch never lands mid ranked session, and stop Windows from swapping your GPU driver automatically. Security updates still arrive, just on your schedule."/>
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                  <TextBlock Text="Defer updates" VerticalAlignment="Center" Margin="0,0,8,0" Foreground="#FFE8E8F0"/>
+                  <ComboBox x:Name="cmbWuDefer" Width="180" Padding="7" FontSize="13"
+                            Background="#FF0D0D14" Foreground="#FFE8E8F0" BorderBrush="#FF3A3A52">
+                    <ComboBoxItem Content="No defer" IsSelected="True"/>
+                    <ComboBoxItem Content="Defer 7 days"/>
+                    <ComboBoxItem Content="Defer 14 days"/>
+                    <ComboBoxItem Content="Defer 30 days"/>
+                  </ComboBox>
+                </StackPanel>
+                <CheckBox x:Name="chkWuNoDrivers" Style="{StaticResource DarkCheck}"
+                          Content="Block driver updates through Windows Update"/>
+                <CheckBox x:Name="chkWuNoReboot" Style="{StaticResource DarkCheck}"
+                          Content="Never auto-restart while I am signed in"/>
+                <Button x:Name="btnApplyWu" Style="{StaticResource AccentButton}" Content="Apply Update Settings"
+                        HorizontalAlignment="Left" Margin="0,4,0,0"/>
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- ================= APPS ================= -->
+      <TabItem Header="Apps" Style="{StaticResource DarkTab}">
+        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="4">
+          <StackPanel>
+            <Border Style="{StaticResource Card}">
+              <StackPanel>
+                <TextBlock Style="{StaticResource CardHeader}" Text="Fresh Install Kit"/>
+                <TextBlock Style="{StaticResource DimText}"
+                           Text="Tick the apps you want and install them all in one batch with winget, the Windows package manager. Needs internet. Nothing is bundled with this tool itself, installs come straight from the publishers."/>
+                <WrapPanel x:Name="panelApps" Margin="0,0,0,6">
+                  <CheckBox Style="{StaticResource DarkCheck}" Content="Google Chrome" Tag="Google.Chrome" Width="235"/>
+                  <CheckBox Style="{StaticResource DarkCheck}" Content="Mozilla Firefox" Tag="Mozilla.Firefox" Width="235"/>
+                  <CheckBox Style="{StaticResource DarkCheck}" Content="Brave Browser" Tag="Brave.Brave" Width="235"/>
+                  <CheckBox Style="{StaticResource DarkCheck}" Content="Steam" Tag="Valve.Steam" Width="235"/>
+                  <CheckBox Style="{StaticResource DarkCheck}" Content="Epic Games Launcher" Tag="EpicGames.EpicGamesLauncher" Width="235"/>
+                  <CheckBox Style="{StaticResource DarkCheck}" Content="GOG Galaxy" Tag="GOG.Galaxy" Width="235"/>
+                  <CheckBox Style="{StaticResource DarkCheck}" Content="Discord" Tag="Discord.Discord" Width="235"/>
+                  <CheckBox Style="{StaticResource DarkCheck}" Content="7-Zip" Tag="7zip.7zip" Width="235"/>
+                  <CheckBox Style="{StaticResource DarkCheck}" Content="Notepad++" Tag="Notepad++.Notepad++" Width="235"/>
+                  <CheckBox Style="{StaticResource DarkCheck}" Content="Everything Search" Tag="voidtools.Everything" Width="235"/>
+                  <CheckBox Style="{StaticResource DarkCheck}" Content="PowerToys" Tag="Microsoft.PowerToys" Width="235"/>
+                  <CheckBox Style="{StaticResource DarkCheck}" Content="VLC Player" Tag="VideoLAN.VLC" Width="235"/>
+                  <CheckBox Style="{StaticResource DarkCheck}" Content="OBS Studio" Tag="OBSProject.OBSStudio" Width="235"/>
+                  <CheckBox Style="{StaticResource DarkCheck}" Content="VC++ Redist x64" Tag="Microsoft.VCRedist.2015+.x64" Width="235"/>
+                  <CheckBox Style="{StaticResource DarkCheck}" Content="VC++ Redist x86" Tag="Microsoft.VCRedist.2015+.x86" Width="235"/>
+                </WrapPanel>
+                <WrapPanel>
+                  <Button x:Name="btnAppsAll" Style="{StaticResource DarkButton}" Content="Select All" Margin="0,0,8,8"/>
+                  <Button x:Name="btnAppsNone" Style="{StaticResource DarkButton}" Content="Clear Selection" Margin="0,0,8,8"/>
+                  <Button x:Name="btnAppsInstall" Style="{StaticResource AccentButton}" Content="Install Selected with winget" Margin="0,0,8,8"/>
+                </WrapPanel>
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- ================= GAMES ================= -->
+      <TabItem Header="Games" Style="{StaticResource DarkTab}">
+        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="4">
+          <StackPanel>
+            <Border Style="{StaticResource Card}">
+              <StackPanel>
+                <TextBlock Style="{StaticResource CardHeader}" Text="Detected Games"/>
+                <TextBlock Style="{StaticResource DimText}"
+                           Text="Games found in your Steam libraries plus anything you add manually. Per-game flags are per Windows user and are recorded so the Backups tab can undo them."/>
+                <ListBox x:Name="listGames" Height="220" Background="#FF0D0D14" Foreground="#FFE8E8F0"
+                         BorderBrush="#FF3A3A52" FontFamily="Consolas" FontSize="12"/>
+                <WrapPanel Margin="0,10,0,0">
+                  <Button x:Name="btnGamesRefresh" Style="{StaticResource DarkButton}" Content="Refresh List" Margin="0,0,8,8"/>
+                  <Button x:Name="btnGameAdd" Style="{StaticResource DarkButton}" Content="Add Custom EXE" Margin="0,0,8,8"/>
+                  <Button x:Name="btnGameRemove" Style="{StaticResource DarkButton}" Content="Remove Selected from List" Margin="0,0,8,8"/>
+                </WrapPanel>
+              </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource Card}">
+              <StackPanel>
+                <TextBlock Style="{StaticResource CardHeader}" Text="Tweaks for the Selected Game"/>
+                <CheckBox x:Name="chkGameGpu" Style="{StaticResource DarkCheck}"
+                          Content="Force high performance GPU for this game"/>
+                <CheckBox x:Name="chkGameFse" Style="{StaticResource DarkCheck}"
+                          Content="Disable fullscreen optimizations for this game"/>
+                <Button x:Name="btnApplyGame" Style="{StaticResource AccentButton}" Content="Apply to Selected Game"
+                        HorizontalAlignment="Left" Margin="0,4,0,0"/>
               </StackPanel>
             </Border>
           </StackPanel>
@@ -1032,6 +1171,35 @@ function Remove-BloatApps {
 
     if ($groups.Count -eq 0) {
         Write-Log 'No bloatware groups selected, skipping removal'
+        return
+    }
+
+    # Dry run preview: show exactly what would be removed before touching anything
+    $previewNames = @()
+    foreach ($groupName in $groups.Keys) {
+        foreach ($packageName in $groups[$groupName]) {
+            $foundPkgs = @(Get-AppxPackage -AllUsers -Name ($packageName + '*') -ErrorAction SilentlyContinue)
+            foreach ($pkg in $foundPkgs) { $previewNames += $pkg.PackageFullName }
+        }
+    }
+    $uniqueNames = @($previewNames | Select-Object -Unique)
+
+    if ($uniqueNames.Count -eq 0) {
+        Write-Log 'None of the selected apps are installed, nothing to remove'
+        return
+    }
+
+    $previewText = 'About to remove these {0} app packages:' -f $uniqueNames.Count
+    foreach ($line in ($uniqueNames | Select-Object -First 20)) {
+        $previewText += ('{0}  {1}' -f "`n", $line)
+    }
+    if ($uniqueNames.Count -gt 20) {
+        $previewText += ('{0}  ... and {1} more' -f "`n", ($uniqueNames.Count - 20))
+    }
+    $previewText += ('{0}{0}Nothing has been removed yet. Continue?' -f "`n")
+
+    if (-not (Confirm-Action 'Remove bloatware' $previewText)) {
+        Write-Log 'Bloatware removal cancelled, nothing was changed' 'WARN'
         return
     }
 
@@ -2645,6 +2813,295 @@ function Remove-RecallSnapshots {
 }
 
 # ----------------------------------------------------------------------------
+# Fresh install kit (winget) and per-game tuning
+# ----------------------------------------------------------------------------
+function Install-SelectedApps {
+    $selected = @()
+    foreach ($box in $panelApps.Children) {
+        if ($box -is [System.Windows.Controls.CheckBox] -and $box.IsChecked -eq $true) {
+            $selected += [pscustomobject]@{ Name = [string]$box.Content; Id = [string]$box.Tag }
+        }
+    }
+
+    if ($selected.Count -eq 0) {
+        Write-Log 'No apps ticked, nothing to install' 'WARN'
+        return
+    }
+
+    $winget = Get-Command -Name 'winget' -ErrorAction SilentlyContinue
+    if ($null -eq $winget) {
+        Write-Log 'winget is not available on this system. Install "App Installer" from the Microsoft Store first.' 'ERROR'
+        return
+    }
+
+    $names = ($selected | ForEach-Object { $_.Name }) -join ', '
+    if (-not (Confirm-Action 'Install apps' ('Install {0} app(s) with winget?{1}{2}{1}{1}This needs internet and each installer may show its own window.' -f $selected.Count, "`n", $names))) {
+        Write-Log 'App install cancelled' 'WARN'
+        return
+    }
+
+    foreach ($app in $selected) {
+        Write-Log ('Installing {0} ({1})...' -f $app.Name, $app.Id)
+        try {
+            $output = & winget.exe install --id $app.Id --silent --accept-package-agreements --accept-source-agreements 2>&1 | Out-String
+            if ($LASTEXITCODE -eq 0) {
+                Write-Log ('Installed {0}' -f $app.Name) 'OK'
+            } elseif ($output -match 'already installed') {
+                Write-Log ('{0} is already installed' -f $app.Name) 'INFO'
+            } else {
+                Write-Log ('{0} failed (winget exit code {1})' -f $app.Name, $LASTEXITCODE) 'ERROR'
+            }
+        } catch {
+            Write-Log ('{0} failed: {1}' -f $app.Name, $_.Exception.Message) 'ERROR'
+        }
+    }
+    Write-Log 'Batch install finished' 'OK'
+}
+
+function Get-SteamLibraries {
+    $roots = @()
+    foreach ($key in @('HKLM:\SOFTWARE\WOW6432Node\Valve\Steam', 'HKLM:\SOFTWARE\Valve\Steam', 'HKCU:\SOFTWARE\Valve\Steam')) {
+        if (Test-Path -LiteralPath $key) {
+            $installPath = (Get-ItemProperty -LiteralPath $key -ErrorAction SilentlyContinue).InstallPath
+            if (-not [string]::IsNullOrWhiteSpace($installPath)) { $roots += $installPath }
+        }
+    }
+
+    $libraries = @()
+    foreach ($root in ($roots | Select-Object -Unique)) {
+        $libraries += $root
+        $vdf = Join-Path $root 'steamapps\libraryfolders.vdf'
+        if (Test-Path -LiteralPath $vdf) {
+            foreach ($line in (Get-Content -LiteralPath $vdf -ErrorAction SilentlyContinue)) {
+                if ($line -match '"path"\s*"([^"]+)"') {
+                    $libraries += ($Matches[1] -replace '\\\\', '\')
+                }
+            }
+        }
+    }
+    return @($libraries | Select-Object -Unique)
+}
+
+function Update-GameList {
+    if ($null -eq $listGames) { return }
+
+    $customGames = @()
+    foreach ($item in $listGames.Items) {
+        if ($item.Tag.Source -eq 'custom') { $customGames += $item.Tag }
+    }
+    $listGames.Items.Clear()
+
+    $detected = @()
+    foreach ($library in (Get-SteamLibraries)) {
+        $steamApps = Join-Path $library 'steamapps'
+        if (-not (Test-Path -LiteralPath $steamApps)) { continue }
+        $manifests = Get-ChildItem -LiteralPath $steamApps -Filter 'appmanifest_*.acf' -ErrorAction SilentlyContinue
+        foreach ($manifest in $manifests) {
+            $text = Get-Content -LiteralPath $manifest.FullName -Raw -ErrorAction SilentlyContinue
+            $name = $null
+            $dir = $null
+            if ($text -match '"name"\s*"([^"]+)"') { $name = $Matches[1] }
+            if ($text -match '"installdir"\s*"([^"]+)"') { $dir = $Matches[1] }
+            if ([string]::IsNullOrWhiteSpace($name) -or [string]::IsNullOrWhiteSpace($dir)) { continue }
+
+            $gameDir = Join-Path (Join-Path $steamApps 'common') $dir
+            if (-not (Test-Path -LiteralPath $gameDir)) { continue }
+            $mainExe = Get-ChildItem -LiteralPath $gameDir -Filter '*.exe' -File -ErrorAction SilentlyContinue |
+                Sort-Object Length -Descending | Select-Object -First 1
+            if ($null -eq $mainExe) { continue }
+
+            $detected += [pscustomobject]@{ Name = $name; ExePath = $mainExe.FullName; Source = 'Steam' }
+        }
+    }
+
+    foreach ($game in ($detected | Sort-Object Name)) {
+        $item = New-Object System.Windows.Controls.ListBoxItem
+        $item.Content = ('{0}   [{1}]' -f $game.Name, $game.Source)
+        $item.Tag = $game
+        [void]$listGames.Items.Add($item)
+    }
+    foreach ($game in $customGames) {
+        $item = New-Object System.Windows.Controls.ListBoxItem
+        $item.Content = ('{0}   [custom]' -f $game.Name)
+        $item.Tag = $game
+        [void]$listGames.Items.Add($item)
+    }
+
+    Write-Log ('Games in the list: {0} ({1} from Steam)' -f $listGames.Items.Count, $detected.Count)
+}
+
+function Add-CustomGame {
+    $dialog = New-Object Microsoft.Win32.OpenFileDialog
+    $dialog.Filter = 'Game executables (*.exe)|*.exe'
+    $dialog.Title = 'Select the game executable'
+    if ($dialog.ShowDialog() -eq $true) {
+        $game = [pscustomobject]@{
+            Name    = [System.IO.Path]::GetFileNameWithoutExtension($dialog.FileName)
+            ExePath = $dialog.FileName
+            Source  = 'custom'
+        }
+        $item = New-Object System.Windows.Controls.ListBoxItem
+        $item.Content = ('{0}   [custom]' -f $game.Name)
+        $item.Tag = $game
+        [void]$listGames.Items.Add($item)
+        Write-Log ('Game added: {0}' -f $game.Name) 'OK'
+    }
+}
+
+function Update-GameCheckboxes {
+    if ($null -eq $listGames.SelectedItem) { return }
+    $game = [pscustomobject]$listGames.SelectedItem.Tag
+
+    $gpuVal = $null
+    $gpuProps = Get-ItemProperty -Path 'HKCU:\SOFTWARE\Microsoft\DirectX\UserGpuPreferences' -ErrorAction SilentlyContinue
+    if ($null -ne $gpuProps) {
+        $match = $gpuProps.PSObject.Properties | Where-Object { $_.Name -eq $game.ExePath }
+        if ($null -ne $match) { $gpuVal = $match.Value }
+    }
+    $chkGameGpu.IsChecked = ($gpuVal -eq 'GpuPreference=2;')
+
+    $fseVal = $null
+    $layerProps = Get-ItemProperty -Path 'HKCU:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\Layers' -ErrorAction SilentlyContinue
+    if ($null -ne $layerProps) {
+        $match = $layerProps.PSObject.Properties | Where-Object { $_.Name -eq $game.ExePath }
+        if ($null -ne $match) { $fseVal = $match.Value }
+    }
+    $chkGameFse.IsChecked = ($fseVal -match 'DISABLEDXMAXIMIZEDWINDOWEDMODE')
+}
+
+function Apply-GameTweaks {
+    if ($null -eq $listGames.SelectedItem) {
+        Write-Log 'Select a game in the list first' 'WARN'
+        return
+    }
+    $game = [pscustomobject]$listGames.SelectedItem.Tag
+    Write-Log ('Applying per-game tweaks for {0}' -f $game.Name)
+
+    $gpuKey = 'HKCU:\SOFTWARE\Microsoft\DirectX\UserGpuPreferences'
+    $layerKey = 'HKCU:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\Layers'
+
+    if ($chkGameGpu.IsChecked) {
+        Set-RegValue -Path $gpuKey -Name $game.ExePath -Value 'GpuPreference=2;' -Type 'String' | Out-Null
+    } else {
+        Backup-RegValue -Path $gpuKey -Name $game.ExePath
+        Remove-ItemProperty -Path $gpuKey -Name $game.ExePath -ErrorAction SilentlyContinue
+        Write-Log 'High performance GPU flag removed' 'OK'
+    }
+
+    if ($chkGameFse.IsChecked) {
+        Set-RegValue -Path $layerKey -Name $game.ExePath -Value '~ DISABLEDXMAXIMIZEDWINDOWEDMODE' -Type 'String' | Out-Null
+    } else {
+        Backup-RegValue -Path $layerKey -Name $game.ExePath
+        Remove-ItemProperty -Path $layerKey -Name $game.ExePath -ErrorAction SilentlyContinue
+        Write-Log 'Fullscreen optimizations flag removed' 'OK'
+    }
+
+    Write-Log 'Per-game tweaks applied. Restart the game to pick them up.' 'OK'
+}
+
+# ----------------------------------------------------------------------------
+# Windows Update control, power plan editor, standby monitor
+# ----------------------------------------------------------------------------
+function Apply-WuSettings {
+    Write-Log 'Applying Windows Update settings...'
+    $wu = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate'
+
+    $deferDays = 0
+    switch ($cmbWuDefer.SelectedIndex) {
+        1 { $deferDays = 7 }
+        2 { $deferDays = 14 }
+        3 { $deferDays = 30 }
+        default { $deferDays = 0 }
+    }
+
+    if ($deferDays -gt 0) {
+        Set-RegValue -Path $wu -Name 'DeferQualityUpdates' -Value 1 | Out-Null
+        Set-RegValue -Path $wu -Name 'DeferQualityUpdatesPeriodInDays' -Value $deferDays | Out-Null
+        Set-RegValue -Path $wu -Name 'DeferFeatureUpdates' -Value 1 | Out-Null
+        Set-RegValue -Path $wu -Name 'DeferFeatureUpdatesPeriodInDays' -Value $deferDays | Out-Null
+    } else {
+        Set-RegValue -Path $wu -Name 'DeferQualityUpdates' -Value 0 | Out-Null
+        Set-RegValue -Path $wu -Name 'DeferFeatureUpdates' -Value 0 | Out-Null
+    }
+
+    if ($chkWuNoDrivers.IsChecked) {
+        Set-RegValue -Path $wu -Name 'ExcludeWUDriversInQualityUpdate' -Value 1 | Out-Null
+    } else {
+        Set-RegValue -Path $wu -Name 'ExcludeWUDriversInQualityUpdate' -Value 0 | Out-Null
+    }
+
+    if ($chkWuNoReboot.IsChecked) {
+        Set-RegValue -Path $wu -Name 'NoAutoRebootWithLoggedOnUsers' -Value 1 | Out-Null
+    } else {
+        Set-RegValue -Path $wu -Name 'NoAutoRebootWithLoggedOnUsers' -Value 0 | Out-Null
+    }
+
+    Write-Log ('Windows Update settings applied (defer {0} days). They take effect after the next update scan.' -f $deferDays) 'OK'
+}
+
+function Apply-PowerPlanEditor {
+    Write-Log 'Writing custom values to the active power plan...'
+
+    $subProc   = '54533251-82be-4824-96c1-47b60b740d00'
+    $procMin   = '893dee8e-2bef-41e0-89c6-b55d0929964c'
+    $procMax   = '75b0ae3f-bce0-45a7-8c89-c9611c25e100'
+    $subPcie   = '501a4d13-42af-4429-9fd1-a8218c268e20'
+    $pcieAspm  = 'ee12f906-d277-404b-b6da-e5fa1a576df5'
+    $subVideo  = '7516b95f-f776-4464-8c53-06167f40cc99'
+    $videoIdle = '3c0bc021-c8a8-4e07-a973-6b14cbcb2b7e'
+
+    $cpuMin = [int]$sldCpuMin.Value
+    $cpuMax = [int]$sldCpuMax.Value
+    $pcie = $cmbPcie.SelectedIndex
+    $idleSeconds = [int]($sldDisplayOff.Value * 60)
+
+    if ($cpuMin -gt $cpuMax) {
+        Write-Log 'CPU min state cannot exceed CPU max state' 'WARN'
+        return
+    }
+
+    & powercfg.exe /setacvalueindex scheme_current $subProc $procMin $cpuMin 2>$null | Out-Null
+    & powercfg.exe /setacvalueindex scheme_current $subProc $procMax $cpuMax 2>$null | Out-Null
+    & powercfg.exe /setacvalueindex scheme_current $subPcie $pcieAspm $pcie 2>$null | Out-Null
+    & powercfg.exe /setacvalueindex scheme_current $subVideo $videoIdle $idleSeconds 2>$null | Out-Null
+    & powercfg.exe /setactive scheme_current 2>$null | Out-Null
+
+    if ($LASTEXITCODE -eq 0) {
+        Write-Log ('Power plan set: CPU {0}-{1} percent, PCIe mode {2}, display off after {3} min' -f $cpuMin, $cpuMax, $pcie, $sldDisplayOff.Value) 'OK'
+    } else {
+        Write-Log 'Power plan values applied with a warning, check the plan in Windows settings' 'WARN'
+    }
+}
+
+$script:MonitorTimer = $null
+$script:LastPurgeLog = [datetime]::MinValue
+
+function Start-StandbyMonitor {
+    if ($null -ne $script:MonitorTimer) { return }
+
+    $script:MonitorTimer = New-Object System.Windows.Threading.DispatcherTimer
+    $script:MonitorTimer.Interval = [TimeSpan]::FromSeconds(5)
+    $script:MonitorTimer.Add_Tick({
+        try {
+            $os = Get-CimInstance -ClassName Win32_OperatingSystem -ErrorAction Stop
+            $freeMb = [int]($os.FreePhysicalMemory / 1KB)
+            $thresholdMb = [int]$sldMonitorThreshold.Value
+            $txtMonitorStatus.Text = ('Monitoring: {0} MB free, purge under {1} MB' -f $freeMb, $thresholdMb)
+
+            if ($chkMonitorEnable.IsChecked -and $freeMb -lt $thresholdMb) {
+                $outcome = [BaldyBeast.Memory]::PurgeStandbyList()
+                if (((Get-Date) - $script:LastPurgeLog) -gt [TimeSpan]::FromSeconds(60)) {
+                    Write-Log ('Auto-purge at {0} MB free (threshold {1} MB): {2}' -f $freeMb, $thresholdMb, $outcome) 'OK'
+                    $script:LastPurgeLog = Get-Date
+                }
+            }
+        } catch { }
+    })
+    $script:MonitorTimer.Start()
+    Write-Log 'Standby monitor armed. It only acts while this tool is open and the box is ticked.' 'INFO'
+}
+
+# ----------------------------------------------------------------------------
 # Build the WPF window
 # ----------------------------------------------------------------------------
 Add-Type -AssemblyName PresentationFramework
@@ -2692,7 +3149,12 @@ $controlNames = @(
     'btnExportBundle', 'btnMakeShortcut', 'chkClassicMenu',
     'txtMemory', 'btnPurgeStandby', 'btnMemoryRefresh', 'btnPurgeStandbyQuick',
     'chkTaskbarLeft', 'chkTaskbarSearch', 'chkTaskbarTaskView', 'btnApplyRecommended', 'btnOpenDisplay',
-    'listRestorePoints', 'btnRestorePointGo', 'btnRestorePointRefresh', 'btnWipeRecall'
+    'listRestorePoints', 'btnRestorePointGo', 'btnRestorePointRefresh', 'btnWipeRecall',
+    'panelApps', 'btnAppsAll', 'btnAppsNone', 'btnAppsInstall',
+    'listGames', 'btnGamesRefresh', 'btnGameAdd', 'btnGameRemove', 'chkGameGpu', 'chkGameFse', 'btnApplyGame',
+    'cmbWuDefer', 'chkWuNoDrivers', 'chkWuNoReboot', 'btnApplyWu',
+    'sldCpuMin', 'sldCpuMax', 'cmbPcie', 'sldDisplayOff', 'btnApplyPower',
+    'chkMonitorEnable', 'sldMonitorThreshold', 'txtMonitorStatus'
 )
 
 $missingNames = @()
@@ -2752,6 +3214,12 @@ Safety and compatibility:
   The Backups tab lists Windows System Restore points and can restore the whole
   PC to any of them. Options that do not apply to your Windows build are greyed
   out automatically. The Clean tab can delete Windows Recall snapshot data.
+
+Fresh install and games:
+  The Apps tab installs a curated essentials list through winget in one batch.
+  The Games tab detects your Steam games and sets per-game flags (high
+  performance GPU, fullscreen optimizations off). Bloatware removal shows an
+  exact preview before deleting anything.
 
 One line install from GitHub:
   irm "$($script:RepoRawUrl)" | iex
@@ -2992,6 +3460,37 @@ $btnWipeRecall.Add_Click({
     }
 })
 
+$btnAppsAll.Add_Click({
+    foreach ($box in $panelApps.Children) {
+        if ($box -is [System.Windows.Controls.CheckBox]) { $box.IsChecked = $true }
+    }
+    Write-Log 'All apps in the kit are ticked' 'OK'
+})
+$btnAppsNone.Add_Click({
+    foreach ($box in $panelApps.Children) {
+        if ($box -is [System.Windows.Controls.CheckBox]) { $box.IsChecked = $false }
+    }
+    Write-Log 'App selection cleared' 'OK'
+})
+$btnAppsInstall.Add_Click({ Install-SelectedApps })
+
+$btnGamesRefresh.Add_Click({ Update-GameList })
+$btnGameAdd.Add_Click({ Add-CustomGame })
+$btnGameRemove.Add_Click({
+    if ($null -ne $listGames.SelectedItem) {
+        $name = [string]$listGames.SelectedItem.Tag.Name
+        [void]$listGames.Items.Remove($listGames.SelectedItem)
+        Write-Log ('Game removed from the list: {0} (its registry flags are untouched)' -f $name) 'OK'
+    } else {
+        Write-Log 'Select a game in the list first' 'WARN'
+    }
+})
+$listGames.Add_SelectionChanged({ Update-GameCheckboxes })
+$btnApplyGame.Add_Click({ Apply-GameTweaks })
+
+$btnApplyWu.Add_Click({ Apply-WuSettings })
+$btnApplyPower.Add_Click({ Apply-PowerPlanEditor })
+
 # ----------------------------------------------------------------------------
 # Startup log
 # ----------------------------------------------------------------------------
@@ -3074,6 +3573,8 @@ Update-ProfileList
 Update-BackupList
 Update-RestorePointList
 Update-StartupList
+Update-GameList
+Start-StandbyMonitor
 $txtNetwork.Text = ((Get-NetworkSummary) -join [System.Environment]::NewLine)
 Test-ForUpdate
 
