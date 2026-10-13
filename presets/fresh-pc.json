@@ -1,0 +1,27 @@
+{
+    "Name": "Fresh PC",
+    "Version": "1.6.0",
+    "CreatedUtc": "2026-10-13T00:00:00",
+    "Description": "Full debloat for a clean install: telemetry, consumer junk, background apps and taskbar noise gone.",
+    "Checked": [
+        "chkBloatBing",
+        "chkBloat3D",
+        "chkBloatGames",
+        "chkBloatCortana",
+        "chkTelemetry",
+        "chkServices",
+        "chkCortana",
+        "chkBackgroundApps",
+        "chkConsumer",
+        "chkActivity",
+        "chkWidgets",
+        "chkCopilot",
+        "chkRecall",
+        "chkClassicMenu",
+        "chkTaskbarLeft",
+        "chkTaskbarSearch",
+        "chkTaskbarTaskView",
+        "chkWuNoDrivers",
+        "chkWuNoReboot"
+    ]
+}

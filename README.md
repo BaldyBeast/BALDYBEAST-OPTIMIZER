@@ -1,5 +1,10 @@
 # BALDYBEAST OPTIMIZER
 
+![CI](https://github.com/BaldyBeast/BALDYBEAST-OPTIMIZER/actions/workflows/ci.yml/badge.svg)
+
+Every push runs the full validation harness, PSScriptAnalyzer and a UI render pass.
+Check the Actions tab for the latest run, including screenshots of every tab.
+
 ```
 ######   #####  #       ######  #     # ######  #######  #####   #####  #######
 #     # #     # #       #     # #     # #     # #       #     # #          #
@@ -25,6 +30,20 @@ Or clone the repo and run the file directly:
 ```powershell
 powershell -ExecutionPolicy Bypass -File Optimize.ps1
 ```
+
+## What's new in v1.6
+
+- **Fixed**: dropdown menus (Windows Update, power plan, DNS) rendered white on
+  white and were unreadable. All dropdowns now use a proper dark template.
+- **Fixed**: closing the GUI left its console window open. The console now
+  closes with the window when the tool owns it (shortcut, relaunch, -File).
+- **Tray mode**: minimize to the system tray with quick actions (reopen, purge
+  standby list, exit) from the tray icon.
+- **Game launch detection**: optionally purges the standby list automatically
+  when a game from the Games tab list starts.
+- **Profile sharing**: load a profile straight from any https URL in the
+  Profiles tab, plus three official presets in the `presets/` folder
+  (Competitive FPS, Streaming, Fresh PC).
 
 ## What's new in v1.5
 

@@ -1,0 +1,17 @@
+{
+    "Name": "Streaming",
+    "Version": "1.6.0",
+    "CreatedUtc": "2026-10-13T00:00:00",
+    "Description": "Performance tweaks that keep Game DVR and capture working for clips and streams.",
+    "Checked": [
+        "chkPowerPlan",
+        "chkGameMode",
+        "chkMmcss",
+        "chkUsbSuspend",
+        "chkVisualFx",
+        "chkTelemetry",
+        "chkBackgroundApps",
+        "chkGameDVR",
+        "chkTaskbarSearch"
+    ]
+}

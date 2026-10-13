@@ -1,0 +1,23 @@
+{
+    "Name": "Competitive FPS",
+    "Version": "1.6.0",
+    "CreatedUtc": "2026-10-13T00:00:00",
+    "Description": "Lowest input lag setup for competitive shooters. Keeps capture tools off and clocks high.",
+    "Checked": [
+        "chkPowerPlan",
+        "chkMouseAccel",
+        "chkGameDVR",
+        "chkFullscreen",
+        "chkGameMode",
+        "chkHAGS",
+        "chkMmcss",
+        "chkUsbSuspend",
+        "chkVisualFx",
+        "chkTelemetry",
+        "chkBackgroundApps",
+        "chkClassicMenu",
+        "chkTaskbarLeft",
+        "chkTaskbarSearch",
+        "chkTaskbarTaskView"
+    ]
+}

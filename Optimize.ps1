@@ -12,7 +12,7 @@
 
 $ErrorActionPreference = 'Continue'
 
-$script:AppVersion   = '1.5.0'
+$script:AppVersion   = '1.6.0'
 $script:RepoRawUrl   = 'https://raw.githubusercontent.com/BaldyBeast/BALDYBEAST-OPTIMIZER/main/Optimize.ps1'
 $script:LogFile      = Join-Path $env:TEMP 'BaldyBeast-Optimizer.log'
 $script:LogBox       = $null
@@ -288,6 +288,85 @@ $xamlA = @'
       <Setter Property="Margin" Value="0,4,0,8"/>
     </Style>
 
+    <Style TargetType="ToggleButton" x:Key="ComboToggle">
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="ToggleButton">
+            <Border x:Name="bd" Background="#FF0D0D14" BorderBrush="#FF3A3A52" BorderThickness="1"
+                    CornerRadius="6" Padding="8,6">
+              <Grid>
+                <ContentPresenter/>
+                <Path HorizontalAlignment="Right" VerticalAlignment="Center" Fill="#FFB8B8CC"
+                      Data="M 0 0 L 4 4 L 8 0 Z" Margin="0,0,4,0"/>
+              </Grid>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="bd" Property="BorderBrush" Value="#FF5A5A7A"/>
+              </Trigger>
+              <Trigger Property="IsChecked" Value="True">
+                <Setter TargetName="bd" Property="BorderBrush" Value="#FFF59E0B"/>
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <Style TargetType="ComboBox" x:Key="DarkCombo">
+      <Setter Property="Foreground" Value="#FFE8E8F0"/>
+      <Setter Property="Background" Value="#FF0D0D14"/>
+      <Setter Property="FontSize" Value="13"/>
+      <Setter Property="ItemContainerStyle">
+        <Setter.Value>
+          <Style TargetType="ComboBoxItem">
+            <Setter Property="Foreground" Value="#FFE8E8F0"/>
+            <Setter Property="Padding" Value="8,5"/>
+            <Setter Property="Template">
+              <Setter.Value>
+                <ControlTemplate TargetType="ComboBoxItem">
+                  <Border x:Name="itemBd" Background="Transparent" Padding="{TemplateBinding Padding}">
+                    <ContentPresenter/>
+                  </Border>
+                  <ControlTemplate.Triggers>
+                    <Trigger Property="IsHighlighted" Value="True">
+                      <Setter TargetName="itemBd" Property="Background" Value="#FF33335A"/>
+                    </Trigger>
+                    <Trigger Property="IsSelected" Value="True">
+                      <Setter TargetName="itemBd" Property="Background" Value="#FFF59E0B"/>
+                      <Setter Property="Foreground" Value="#FF201500"/>
+                    </Trigger>
+                  </ControlTemplate.Triggers>
+                </ControlTemplate>
+              </Setter.Value>
+            </Setter>
+          </Style>
+        </Setter.Value>
+      </Setter>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="ComboBox">
+            <Grid>
+              <ToggleButton Style="{StaticResource ComboToggle}" Focusable="False" ClickMode="Press"
+                            IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}">
+                <ContentPresenter Content="{TemplateBinding SelectionBoxItem}"
+                                  ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                  Margin="4,0,22,0" VerticalAlignment="Center"/>
+              </ToggleButton>
+              <Popup x:Name="PART_Popup" Placement="Bottom" AllowsTransparency="True"
+                     IsOpen="{TemplateBinding IsDropDownOpen}" PopupAnimation="Fade">
+                <Border Background="#FF1F1F2E" BorderBrush="#FF3A3A52" BorderThickness="1" CornerRadius="6">
+                  <ScrollViewer MaxHeight="260" VerticalScrollBarVisibility="Auto">
+                    <ItemsPresenter/>
+                  </ScrollViewer>
+                </Border>
+              </Popup>
+            </Grid>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
     <Style TargetType="CheckBox" x:Key="DarkCheck">
       <Setter Property="Foreground" Value="#FFE8E8F0"/>
       <Setter Property="FontSize" Value="13"/>
@@ -478,8 +557,7 @@ $xamlA = @'
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
                   <TextBlock Text="PCIe power saving" Width="150" VerticalAlignment="Center" Foreground="#FFE8E8F0"/>
-                  <ComboBox x:Name="cmbPcie" Width="200" Padding="7" FontSize="13"
-                            Background="#FF0D0D14" Foreground="#FFE8E8F0" BorderBrush="#FF3A3A52">
+                  <ComboBox x:Name="cmbPcie" Width="200" Style="{StaticResource DarkCombo}">
                     <ComboBoxItem Content="Off (best latency)" IsSelected="True"/>
                     <ComboBoxItem Content="Moderate"/>
                     <ComboBoxItem Content="Maximum power savings"/>
@@ -708,6 +786,14 @@ $xamlB = @'
                   <Button x:Name="btnLoadProfile" Style="{StaticResource AccentButton}" Content="Load Selected" Margin="0,0,8,0"/>
                   <Button x:Name="btnDeleteProfile" Style="{StaticResource DangerButton}" Content="Delete Selected"/>
                 </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                  <TextBox x:Name="txtPresetUrl" Width="390" Padding="7" FontSize="12"
+                           Background="#FF0D0D14" Foreground="#FFE8E8F0" BorderBrush="#FF3A3A52"
+                           ToolTip="https URL of a shared profile JSON file"/>
+                  <Button x:Name="btnPresetImport" Style="{StaticResource DarkButton}" Content="Load Profile from URL" Margin="8,0,0,0"/>
+                </StackPanel>
+                <TextBlock Style="{StaticResource DimText}"
+                           Text="Example: https://raw.githubusercontent.com/BaldyBeast/BALDYBEAST-OPTIMIZER/main/presets/competitive-fps.json (official presets live in the presets folder of the repo)"/>
               </StackPanel>
             </Border>
           </StackPanel>
@@ -783,8 +869,7 @@ $xamlB = @'
                 <TextBlock Style="{StaticResource DimText}"
                            Text="Cloudflare is fastest for most people, Quad9 adds malware blocking. Every DNS change is recorded so the Backups tab can undo it."/>
                 <StackPanel Orientation="Horizontal">
-                  <ComboBox x:Name="cmbDnsProvider" Width="250" Padding="7" FontSize="13"
-                            Background="#FF0D0D14" Foreground="#FFE8E8F0" BorderBrush="#FF3A3A52">
+                  <ComboBox x:Name="cmbDnsProvider" Width="250" Style="{StaticResource DarkCombo}">
                     <ComboBoxItem Content="Cloudflare (1.1.1.1)" IsSelected="True"/>
                     <ComboBoxItem Content="Google (8.8.8.8)"/>
                     <ComboBoxItem Content="Quad9 (9.9.9.9)"/>
@@ -875,8 +960,7 @@ $xamlB = @'
                            Text="Defer updates so a bad patch never lands mid ranked session, and stop Windows from swapping your GPU driver automatically. Security updates still arrive, just on your schedule."/>
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
                   <TextBlock Text="Defer updates" VerticalAlignment="Center" Margin="0,0,8,0" Foreground="#FFE8E8F0"/>
-                  <ComboBox x:Name="cmbWuDefer" Width="180" Padding="7" FontSize="13"
-                            Background="#FF0D0D14" Foreground="#FFE8E8F0" BorderBrush="#FF3A3A52">
+                  <ComboBox x:Name="cmbWuDefer" Width="180" Style="{StaticResource DarkCombo}">
                     <ComboBoxItem Content="No defer" IsSelected="True"/>
                     <ComboBoxItem Content="Defer 7 days"/>
                     <ComboBoxItem Content="Defer 14 days"/>
@@ -889,6 +973,16 @@ $xamlB = @'
                           Content="Never auto-restart while I am signed in"/>
                 <Button x:Name="btnApplyWu" Style="{StaticResource AccentButton}" Content="Apply Update Settings"
                         HorizontalAlignment="Left" Margin="0,4,0,0"/>
+              </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource Card}">
+              <StackPanel>
+                <TextBlock Style="{StaticResource CardHeader}" Text="System Tray"/>
+                <CheckBox x:Name="chkTrayMode" Style="{StaticResource DarkCheck}"
+                          Content="Minimize to the system tray instead of the taskbar"/>
+                <TextBlock Style="{StaticResource DimText}"
+                           Text="Double-click the tray icon to reopen. Right-click it for Purge Standby List and Exit. Closing the window closes the tool and its console."/>
               </StackPanel>
             </Border>
           </StackPanel>
@@ -958,6 +1052,8 @@ $xamlB = @'
                           Content="Force high performance GPU for this game"/>
                 <CheckBox x:Name="chkGameFse" Style="{StaticResource DarkCheck}"
                           Content="Disable fullscreen optimizations for this game"/>
+                <CheckBox x:Name="chkGameDetect" Style="{StaticResource DarkCheck}"
+                          Content="Auto-purge standby list when any listed game starts (tool must be open)"/>
                 <Button x:Name="btnApplyGame" Style="{StaticResource AccentButton}" Content="Apply to Selected Game"
                         HorizontalAlignment="Left" Margin="0,4,0,0"/>
               </StackPanel>
@@ -1770,7 +1866,8 @@ function Get-AllTweakNames {
         'chkBloatBing', 'chkBloat3D', 'chkBloatGames', 'chkBloatMisc', 'chkBloatCortana',
         'chkTelemetry', 'chkServices', 'chkCortana', 'chkBackgroundApps',
         'chkConsumer', 'chkActivity', 'chkWidgets', 'chkCopilot', 'chkRecall', 'chkOneDrive', 'chkClassicMenu',
-        'chkTaskbarLeft', 'chkTaskbarSearch', 'chkTaskbarTaskView'
+        'chkTaskbarLeft', 'chkTaskbarSearch', 'chkTaskbarTaskView',
+        'chkWuNoDrivers', 'chkWuNoReboot'
     )
 }
 
@@ -2531,7 +2628,7 @@ function New-DesktopShortcut {
             $shortcut.Arguments = ('-NoProfile -ExecutionPolicy Bypass -File "{0}"' -f $PSCommandPath)
         } else {
             $shortcut.TargetPath = 'powershell.exe'
-            $shortcut.Arguments = ('-NoProfile -WindowStyle Hidden -Command "irm ''{0}'' | iex"' -f $script:RepoRawUrl)
+            $shortcut.Arguments = ('-NoProfile -WindowStyle Hidden -Command "irm ''{0}'' | iex; exit"' -f $script:RepoRawUrl)
         }
 
         $shortcut.WorkingDirectory = $desktop
@@ -3088,6 +3185,10 @@ function Start-StandbyMonitor {
             $thresholdMb = [int]$sldMonitorThreshold.Value
             $txtMonitorStatus.Text = ('Monitoring: {0} MB free, purge under {1} MB' -f $freeMb, $thresholdMb)
 
+            if ($chkGameDetect.IsChecked) {
+                Test-GameLaunch
+            }
+
             if ($chkMonitorEnable.IsChecked -and $freeMb -lt $thresholdMb) {
                 $outcome = [BaldyBeast.Memory]::PurgeStandbyList()
                 if (((Get-Date) - $script:LastPurgeLog) -gt [TimeSpan]::FromSeconds(60)) {
@@ -3099,6 +3200,119 @@ function Start-StandbyMonitor {
     })
     $script:MonitorTimer.Start()
     Write-Log 'Standby monitor armed. It only acts while this tool is open and the box is ticked.' 'INFO'
+}
+
+# ----------------------------------------------------------------------------
+# Tray mode, game launch detection, profile import from URL
+# ----------------------------------------------------------------------------
+$script:TrayIcon = $null
+$script:GamesSeen = @{}
+
+function Start-TrayMode {
+    if ($null -ne $script:TrayIcon) { return }
+    try {
+        Add-Type -AssemblyName System.Windows.Forms
+        Add-Type -AssemblyName System.Drawing
+
+        $script:TrayIcon = New-Object System.Windows.Forms.NotifyIcon
+        $script:TrayIcon.Icon = [System.Drawing.SystemIcons]::Application
+        $script:TrayIcon.Text = 'BALDYBEAST OPTIMIZER'
+        $script:TrayIcon.Visible = $false
+
+        $menu = New-Object System.Windows.Forms.ContextMenuStrip
+        $openItem = $menu.Items.Add('Open BALDYBEAST OPTIMIZER')
+        $purgeItem = $menu.Items.Add('Purge Standby List')
+        $exitItem = $menu.Items.Add('Exit')
+
+        $openItem.Add_Click({
+            $window.Show()
+            $window.WindowState = 'Normal'
+            $window.Activate()
+        })
+        $purgeItem.Add_Click({
+            if (Confirm-Action 'Purge Standby List' 'Release all cached file pages from RAM now?') {
+                Clear-StandbyList
+            }
+        })
+        $exitItem.Add_Click({ $window.Close() })
+
+        $script:TrayIcon.ContextMenuStrip = $menu
+        $script:TrayIcon.Add_DoubleClick({
+            $window.Show()
+            $window.WindowState = 'Normal'
+            $window.Activate()
+        })
+    } catch {
+        Write-Log ('Tray mode failed: {0}' -f $_.Exception.Message) 'ERROR'
+    }
+}
+
+function Handle-WindowState {
+    try {
+        if ($null -eq $chkTrayMode -or -not $chkTrayMode.IsChecked) { return }
+        if ($window.WindowState -eq 'Minimized') {
+            Start-TrayMode
+            if ($null -ne $script:TrayIcon) {
+                $window.Hide()
+                $script:TrayIcon.Visible = $true
+            }
+        }
+    } catch { }
+}
+
+function Test-GameLaunch {
+    try {
+        $gameNames = @()
+        foreach ($item in $listGames.Items) {
+            $gameNames += [System.IO.Path]::GetFileNameWithoutExtension([string]$item.Tag.ExePath)
+        }
+        if ($gameNames.Count -eq 0) { return }
+
+        $runningNow = @{}
+        foreach ($procName in ($gameNames | Select-Object -Unique)) {
+            if (@(Get-Process -Name $procName -ErrorAction SilentlyContinue).Count -gt 0) {
+                $runningNow[$procName] = $true
+            }
+        }
+
+        foreach ($procName in $runningNow.Keys) {
+            if (-not $script:GamesSeen[$procName]) {
+                Write-Log ('Game started: {0}. Purging standby list so it gets clean memory.' -f $procName) 'OK'
+                $outcome = [BaldyBeast.Memory]::PurgeStandbyList()
+                Write-Log ('Pre-game purge: {0}' -f $outcome) 'OK'
+            }
+        }
+        $script:GamesSeen = $runningNow
+    } catch { }
+}
+
+function Import-ProfileFromUrl {
+    param([Parameter(Mandatory = $true)][string]$Url)
+
+    if ($Url -notmatch '^https://') {
+        Write-Log 'Only https profile URLs are accepted' 'WARN'
+        return
+    }
+
+    try {
+        Write-Log ('Fetching profile from {0}...' -f $Url)
+        $profile = Invoke-RestMethod -Uri $Url -TimeoutSec 10 -ErrorAction Stop
+        $checked = @($profile.Checked)
+        if ($checked.Count -eq 0) {
+            Write-Log 'That profile contains no tweak selection' 'WARN'
+            return
+        }
+
+        $known = @(Get-AllTweakNames)
+        $valid = @($checked | Where-Object { $known -contains $_ })
+        Set-CheckboxSelection -Names $known -State $false
+        Set-CheckboxSelection -Names $valid -State $true
+
+        Write-Log ('Profile "{0}" loaded: {1} tweaks ticked, {2} unrecognized names skipped' -f $profile.Name, $valid.Count, ($checked.Count - $valid.Count)) 'OK'
+        Write-Log 'Press an Apply button to actually run the ticked tweaks' 'INFO'
+    } catch {
+        Write-Log ('Profile import failed: {0}' -f $_.Exception.Message) 'ERROR'
+    }
 }
 
 # ----------------------------------------------------------------------------
@@ -3154,7 +3368,8 @@ $controlNames = @(
     'listGames', 'btnGamesRefresh', 'btnGameAdd', 'btnGameRemove', 'chkGameGpu', 'chkGameFse', 'btnApplyGame',
     'cmbWuDefer', 'chkWuNoDrivers', 'chkWuNoReboot', 'btnApplyWu',
     'sldCpuMin', 'sldCpuMax', 'cmbPcie', 'sldDisplayOff', 'btnApplyPower',
-    'chkMonitorEnable', 'sldMonitorThreshold', 'txtMonitorStatus'
+    'chkMonitorEnable', 'sldMonitorThreshold', 'txtMonitorStatus',
+    'chkTrayMode', 'chkGameDetect', 'txtPresetUrl', 'btnPresetImport'
 )
 
 $missingNames = @()
@@ -3220,6 +3435,12 @@ Fresh install and games:
   The Games tab detects your Steam games and sets per-game flags (high
   performance GPU, fullscreen optimizations off). Bloatware removal shows an
   exact preview before deleting anything.
+
+Tray, profiles and convenience:
+  Minimize to the system tray with quick purge actions, let the tool purge the
+  standby list automatically when a listed game starts, and share profiles as
+  JSON files loaded straight from a URL. Closing the window also closes the
+  console it was launched in.
 
 One line install from GitHub:
   irm "$($script:RepoRawUrl)" | iex
@@ -3491,6 +3712,20 @@ $btnApplyGame.Add_Click({ Apply-GameTweaks })
 $btnApplyWu.Add_Click({ Apply-WuSettings })
 $btnApplyPower.Add_Click({ Apply-PowerPlanEditor })
 
+$btnPresetImport.Add_Click({
+    Import-ProfileFromUrl -Url $txtPresetUrl.Text
+})
+
+$window.Add_StateChanged({ Handle-WindowState })
+$window.Add_Closed({
+    if ($null -ne $script:TrayIcon) {
+        try {
+            $script:TrayIcon.Visible = $false
+            $script:TrayIcon.Dispose()
+        } catch { }
+    }
+})
+
 # ----------------------------------------------------------------------------
 # Startup log
 # ----------------------------------------------------------------------------
@@ -3548,6 +3783,10 @@ $script:TweakInfo = @{
     'chkTaskbarLeft'    = @('Safe', 'Moves the taskbar icons back to the left like Windows 10. Pure looks, Windows 11 only.')
     'chkTaskbarSearch'  = @('Safe', 'Removes the search box from the taskbar. You can still press the Windows key and type.')
     'chkTaskbarTaskView' = @('Safe', 'Removes the Task View button from the taskbar. Win plus Tab still works.')
+    'chkWuNoDrivers'    = @('Recommended', 'Stops Windows Update from replacing your GPU and chipset drivers automatically.')
+    'chkWuNoReboot'     = @('Safe', 'Windows will never restart the PC on its own while you are signed in.')
+    'chkTrayMode'       = @('Safe', 'Minimize to the system tray instead of the taskbar, with quick purge and exit actions.')
+    'chkGameDetect'     = @('Safe', 'When a game from the list starts, the standby list is purged so the game gets clean memory. The tool must stay open.')
 }
 
 foreach ($infoEntry in $script:TweakInfo.GetEnumerator()) {
@@ -3564,6 +3803,28 @@ foreach ($infoEntry in $script:TweakInfo.GetEnumerator()) {
 $window.Title = ('BALDYBEAST OPTIMIZER v{0}' -f $script:AppVersion)
 try {
     [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+} catch { }
+
+# Detect a console that was spawned just for this tool (shortcut, relaunch,
+# powershell -File). Those close with the GUI so nobody has to click twice.
+# A shell the user typed the one-liner into is never closed.
+$script:OwnConsole = $false
+try {
+    if (-not [string]::IsNullOrWhiteSpace($PSCommandPath)) {
+        $hostArgs = [Environment]::GetCommandLineArgs()
+        for ($i = 0; $i -lt $hostArgs.Count - 1; $i++) {
+            if ($hostArgs[$i] -ieq '-File') {
+                $candidate = $hostArgs[$i + 1]
+                $sameFile = $false
+                try {
+                    $sameFile = ([System.IO.Path]::GetFullPath($candidate) -ieq [System.IO.Path]::GetFullPath($PSCommandPath))
+                } catch { }
+                if ($sameFile -or ((Split-Path -Leaf $candidate) -ieq (Split-Path -Leaf $PSCommandPath))) {
+                    $script:OwnConsole = $true
+                }
+            }
+        }
+    }
 } catch { }
 
 Set-TweakAvailability
@@ -3755,3 +4016,8 @@ if ($script:ValidateMode) {
 
 Write-Log 'GUI ready. Create a restore point first, then apply your tweaks.' 'INFO'
 [void]$window.ShowDialog()
+
+# GUI closed. Shut down the console window too when it belongs to this tool.
+if ($script:OwnConsole) {
+    exit
+}
