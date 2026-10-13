@@ -31,6 +31,14 @@ Or clone the repo and run the file directly:
 powershell -ExecutionPolicy Bypass -File Optimize.ps1
 ```
 
+## What's new in v1.8
+
+- **Snappy GUI**: all monitoring (memory sampling, performance counters, pings,
+  game detection, auto-purge) moved off the UI thread onto a background worker.
+  Tab switching and clicks are instant now, even with every monitor running.
+- **Tab pre-warming**: every tab is laid out once at startup so the first click
+  on each is instant too.
+
 ## What's new in v1.7.1
 
 - **CDN-immune updates**: the update check now resolves the exact commit on

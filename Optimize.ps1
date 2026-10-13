@@ -12,7 +12,7 @@
 
 $ErrorActionPreference = 'Continue'
 
-$script:AppVersion   = '1.7.1'
+$script:AppVersion   = '1.8.0'
 $script:RepoRawUrl   = 'https://raw.githubusercontent.com/BaldyBeast/BALDYBEAST-OPTIMIZER/main/Optimize.ps1'
 $script:LogFile      = Join-Path $env:TEMP 'BaldyBeast-Optimizer.log'
 $script:LogBox       = $null
@@ -2794,6 +2794,38 @@ public static string PurgeStandbyList()
 '@
 }
 
+if (-not ('BaldyBeast.MemInfo' -as [type])) {
+    Add-Type -Namespace BaldyBeast -Name MemInfo -MemberDefinition @'
+[System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+public struct MEMORYSTATUSEX
+{
+    public uint dwLength;
+    public uint dwMemoryLoad;
+    public ulong ullTotalPhys;
+    public ulong ullAvailPhys;
+    public ulong ullTotalPageFile;
+    public ulong ullAvailPageFile;
+    public ulong ullTotalVirtual;
+    public ulong ullAvailVirtual;
+    public ulong ullAvailExtendedVirtual;
+}
+
+[DllImport("kernel32.dll", SetLastError = true)]
+public static extern bool GlobalMemoryStatusEx(ref MEMORYSTATUSEX buffer);
+
+public static long GetFreeMemoryMb()
+{
+    MEMORYSTATUSEX m = new MEMORYSTATUSEX();
+    m.dwLength = (uint)System.Runtime.InteropServices.Marshal.SizeOf(typeof(MEMORYSTATUSEX));
+    if (!GlobalMemoryStatusEx(ref m))
+    {
+        return -1;
+    }
+    return (long)(m.ullAvailPhys / (1024UL * 1024UL));
+}
+'@
+}
+
 function Update-MemoryInfo {
     try {
         $os = Get-CimInstance -ClassName Win32_OperatingSystem -ErrorAction Stop
@@ -3237,30 +3269,16 @@ $script:LastPurgeLog = [datetime]::MinValue
 function Start-StandbyMonitor {
     if ($null -ne $script:MonitorTimer) { return }
 
+    Start-BackgroundWorker
+
+    # Ultra light UI tick: copy flags to the worker and publish its results.
+    # All sampling, pinging and purging runs on the background worker thread,
+    # so tab switching and clicks stay instant.
     $script:MonitorTimer = New-Object System.Windows.Threading.DispatcherTimer
-    $script:MonitorTimer.Interval = [TimeSpan]::FromSeconds(5)
+    $script:MonitorTimer.Interval = [TimeSpan]::FromSeconds(1)
     $script:MonitorTimer.Add_Tick({
         try {
-            $os = Get-CimInstance -ClassName Win32_OperatingSystem -ErrorAction Stop
-            $freeMb = [int]($os.FreePhysicalMemory / 1KB)
-            $thresholdMb = [int]$sldMonitorThreshold.Value
-            $txtMonitorStatus.Text = ('Monitoring: {0} MB free, purge under {1} MB' -f $freeMb, $thresholdMb)
-
-            if ($chkGameDetect.IsChecked) {
-                Test-GameLaunch
-            }
-
-            if ($chkStutterWatch.IsChecked -or $chkPingWatch.IsChecked) {
-                Update-DiagMonitor
-            }
-
-            if ($chkMonitorEnable.IsChecked -and $freeMb -lt $thresholdMb) {
-                $outcome = [BaldyBeast.Memory]::PurgeStandbyList()
-                if (((Get-Date) - $script:LastPurgeLog) -gt [TimeSpan]::FromSeconds(60)) {
-                    Write-Log ('Auto-purge at {0} MB free (threshold {1} MB): {2}' -f $freeMb, $thresholdMb, $outcome) 'OK'
-                    $script:LastPurgeLog = Get-Date
-                }
-            }
+            Sync-MonitorUi
         } catch { }
     })
     $script:MonitorTimer.Start()
@@ -3325,32 +3343,6 @@ function Handle-WindowState {
     } catch { }
 }
 
-function Test-GameLaunch {
-    try {
-        $gameNames = @()
-        foreach ($item in $listGames.Items) {
-            $gameNames += [System.IO.Path]::GetFileNameWithoutExtension([string]$item.Tag.ExePath)
-        }
-        if ($gameNames.Count -eq 0) { return }
-
-        $runningNow = @{}
-        foreach ($procName in ($gameNames | Select-Object -Unique)) {
-            if (@(Get-Process -Name $procName -ErrorAction SilentlyContinue).Count -gt 0) {
-                $runningNow[$procName] = $true
-            }
-        }
-
-        foreach ($procName in $runningNow.Keys) {
-            if (-not $script:GamesSeen[$procName]) {
-                Write-Log ('Game started: {0}. Purging standby list so it gets clean memory.' -f $procName) 'OK'
-                $outcome = [BaldyBeast.Memory]::PurgeStandbyList()
-                Write-Log ('Pre-game purge: {0}' -f $outcome) 'OK'
-            }
-        }
-        $script:GamesSeen = $runningNow
-    } catch { }
-}
-
 function Import-ProfileFromUrl {
     param([Parameter(Mandatory = $true)][string]$Url)
 
@@ -3383,122 +3375,190 @@ function Import-ProfileFromUrl {
 # ----------------------------------------------------------------------------
 # Diagnostics: stutter watch, ping watch, bottleneck scan, health, repair
 # ----------------------------------------------------------------------------
-$script:DiagStats = @{
-    Samples      = 0
-    DpcSpikes    = 0
-    QueueSpikes  = 0
-    LowMemEvents = 0
-    PingsSent    = 0
-    PingsLost    = 0
-    PingSum      = 0.0
-    PingMax      = 0.0
-    TickCount    = 0
-    Events       = New-Object System.Collections.ArrayList
-}
+$script:WorkerRunspace = $null
+$script:LastGameCount = -1
 
-function Add-DiagEvent([string]$Text) {
-    [void]$script:DiagStats.Events.Add(('{0} {1}' -f (Get-Date -Format 'HH:mm:ss'), $Text))
-    while ($script:DiagStats.Events.Count -gt 40) { $script:DiagStats.Events.RemoveAt(0) }
+$script:WorkerState = [hashtable]::Synchronized(@{
+    Stutter     = $false
+    Ping        = $false
+    PurgeOnLow  = $false
+    GameDetect  = $false
+    ThresholdMb = 3000
+    GameNames   = @()
+    PingTargets = @('1.1.1.1')
+    Reset       = $false
+    MonitorText = 'Monitor idle.'
+    DisplayText = ''
+})
+
+function Start-BackgroundWorker {
+    if ($null -ne $script:WorkerRunspace) { return }
+
+    $state = $script:WorkerState
+    $worker = {
+        param($state)
+
+        $tick = 0
+        $gamesSeen = @{}
+        $stats = @{ Samples = 0; DpcSpikes = 0; QueueSpikes = 0; LowMem = 0; Sent = 0; Lost = 0; Sum = 0.0; Max = 0.0 }
+        $events = New-Object System.Collections.ArrayList
+
+        function Add-WorkerEvent([string]$Text) {
+            [void]$events.Add(('{0} {1}' -f (Get-Date -Format 'HH:mm:ss'), $Text))
+            while ($events.Count -gt 40) { $events.RemoveAt(0) }
+        }
+
+        while ($true) {
+            try {
+                Start-Sleep -Seconds 2
+                $tick++
+
+                if ($state.Reset) {
+                    $stats = @{ Samples = 0; DpcSpikes = 0; QueueSpikes = 0; LowMem = 0; Sent = 0; Lost = 0; Sum = 0.0; Max = 0.0 }
+                    $events.Clear()
+                    $gamesSeen = @{}
+                    $state.Reset = $false
+                    $state.DisplayText = ''
+                }
+
+                $freeMb = [BaldyBeast.MemInfo]::GetFreeMemoryMb()
+                if ($freeMb -ge 0) {
+                    $state.MonitorText = ('Monitoring: {0} MB free, purge under {1} MB' -f $freeMb, [int]$state.ThresholdMb)
+                    if ($state.PurgeOnLow -and $freeMb -lt [int]$state.ThresholdMb) {
+                        $result = [BaldyBeast.Memory]::PurgeStandbyList()
+                        Add-WorkerEvent ('auto-purge at {0} MB free: {1}' -f $freeMb, $result)
+                    }
+                }
+
+                if ($state.Stutter) {
+                    try {
+                        $sample = Get-Counter -Counter @('\Processor(_Total)\% DPC Time', '\PhysicalDisk(_Total)\Current Disk Queue Length', '\Processor(_Total)\% Processor Time') -ErrorAction Stop
+                        $dpc = 0.0
+                        $queue = 0.0
+                        $cpu = 0.0
+                        foreach ($s in $sample.CounterSamples) {
+                            if ($s.Path -like '*\% DPC Time') { $dpc = $s.CookedValue }
+                            elseif ($s.Path -like '*Current Disk Queue Length') { $queue = $s.CookedValue }
+                            elseif ($s.Path -like '*\% Processor Time') { $cpu = $s.CookedValue }
+                        }
+                        $stats.Samples++
+                        if ($dpc -gt 10) {
+                            $stats.DpcSpikes++
+                            Add-WorkerEvent ('DPC latency spike {0:N1} percent (a driver is stalling)' -f $dpc)
+                        }
+                        if ($queue -gt 2 -and $cpu -gt 80) {
+                            $stats.QueueSpikes++
+                            Add-WorkerEvent ('disk queue {0:N1} while CPU at {1:N0} percent' -f $queue, $cpu)
+                        }
+                        if ($freeMb -ge 0 -and $freeMb -lt 500) {
+                            $stats.LowMem++
+                            Add-WorkerEvent ('low memory: only {0} MB free' -f $freeMb)
+                        }
+                    } catch { }
+                }
+
+                if ($state.Ping -and ($tick % 3) -eq 0) {
+                    foreach ($target in @($state.PingTargets)) {
+                        try {
+                            $ping = New-Object System.Net.NetworkInformation.Ping
+                            $reply = $ping.Send([string]$target, 1500)
+                            $stats.Sent++
+                            if ($reply.Status -eq 'Success') {
+                                $stats.Sum += $reply.RoundtripTime
+                                if ($reply.RoundtripTime -gt $stats.Max) { $stats.Max = $reply.RoundtripTime }
+                                if ($reply.RoundtripTime -gt 100) {
+                                    Add-WorkerEvent ('ping spike to {0}: {1} ms' -f $target, $reply.RoundtripTime)
+                                }
+                            } else {
+                                $stats.Lost++
+                                Add-WorkerEvent ('packet loss to {0}' -f $target)
+                            }
+                        } catch { }
+                    }
+                }
+
+                if ($state.GameDetect -and @($state.GameNames).Count -gt 0) {
+                    $running = @{}
+                    foreach ($procName in @($state.GameNames)) {
+                        try {
+                            if (@(Get-Process -Name $procName -ErrorAction SilentlyContinue).Count -gt 0) {
+                                $running[$procName] = $true
+                            }
+                        } catch { }
+                    }
+                    foreach ($procName in $running.Keys) {
+                        if (-not $gamesSeen[$procName]) {
+                            Add-WorkerEvent ('game started: {0}, purging standby list' -f $procName)
+                            try {
+                                $result = [BaldyBeast.Memory]::PurgeStandbyList()
+                                Add-WorkerEvent ('pre-game purge: {0}' -f $result)
+                            } catch { }
+                        }
+                    }
+                    $gamesSeen = $running
+                }
+
+                if ($state.Stutter -or $state.Ping) {
+                    $received = $stats.Sent - $stats.Lost
+                    $avgPing = 0.0
+                    if ($received -gt 0) { $avgPing = $stats.Sum / $received }
+                    $lines = @()
+                    $lines += ('STUTTER WATCH  samples {0} | DPC spikes {1} | disk queue spikes {2} | low mem events {3}' -f $stats.Samples, $stats.DpcSpikes, $stats.QueueSpikes, $stats.LowMem)
+                    $lines += ('PING WATCH     sent {0} | lost {1} | avg {2:N0} ms | max {3:N0} ms' -f $stats.Sent, $stats.Lost, $avgPing, $stats.Max)
+                    $lines += ''
+                    $lines += 'RECENT EVENTS (oldest first):'
+                    foreach ($entry in $events) {
+                        $lines += ('  ' + $entry)
+                    }
+                    if ($events.Count -eq 0) {
+                        $lines += '  (none, which is a good sign)'
+                    }
+                    $state.DisplayText = ($lines -join [System.Environment]::NewLine)
+                }
+            } catch { }
+        }
+    }
+
+    try {
+        $script:WorkerRunspace = [runspacefactory]::CreateRunspace()
+        $script:WorkerRunspace.Open()
+        $ps = [powershell]::Create()
+        $ps.Runspace = $script:WorkerRunspace
+        [void]$ps.AddScript($worker).AddArgument($state)
+        $null = $ps.BeginInvoke()
+        Write-Log 'Background monitor worker started' 'INFO'
+    } catch {
+        Write-Log ('Background worker failed: {0}' -f $_.Exception.Message) 'ERROR'
+    }
 }
 
 function Reset-DiagStats {
-    $script:DiagStats.Samples = 0
-    $script:DiagStats.DpcSpikes = 0
-    $script:DiagStats.QueueSpikes = 0
-    $script:DiagStats.LowMemEvents = 0
-    $script:DiagStats.PingsSent = 0
-    $script:DiagStats.PingsLost = 0
-    $script:DiagStats.PingSum = 0.0
-    $script:DiagStats.PingMax = 0.0
-    $script:DiagStats.Events.Clear()
+    $script:WorkerState.Reset = $true
     Write-Log 'Diagnostic stats cleared' 'OK'
 }
 
-function Update-DiagMonitor {
-    try {
-        if ($chkStutterWatch.IsChecked) {
-            $counters = @(
-                '\Processor(_Total)\% Processor Time',
-                '\Processor(_Total)\% DPC Time',
-                '\PhysicalDisk(_Total)\Current Disk Queue Length',
-                '\Memory\Available MBytes'
-            )
-            $sample = Get-Counter -Counter $counters -ErrorAction Stop
-            $cpu = 0.0
-            $dpc = 0.0
-            $queue = 0.0
-            $availMb = 0.0
-            foreach ($s in $sample.CounterSamples) {
-                if ($s.Path -like '*\% DPC Time') { $dpc = $s.CookedValue }
-                elseif ($s.Path -like '*\% Processor Time') { $cpu = $s.CookedValue }
-                elseif ($s.Path -like '*Current Disk Queue Length') { $queue = $s.CookedValue }
-                elseif ($s.Path -like '*Available MBytes') { $availMb = $s.CookedValue }
-            }
+function Sync-MonitorUi {
+    $state = $script:WorkerState
+    $state.Stutter = [bool]$chkStutterWatch.IsChecked
+    $state.Ping = [bool]$chkPingWatch.IsChecked
+    $state.PurgeOnLow = [bool]$chkMonitorEnable.IsChecked
+    $state.GameDetect = [bool]$chkGameDetect.IsChecked
+    $state.ThresholdMb = [int]$sldMonitorThreshold.Value
 
-            $script:DiagStats.Samples++
-            if ($dpc -gt 10) {
-                $script:DiagStats.DpcSpikes++
-                Add-DiagEvent ('DPC latency spike {0:N1} percent (a driver is stalling)' -f $dpc)
-            }
-            if ($queue -gt 2 -and $cpu -gt 80) {
-                $script:DiagStats.QueueSpikes++
-                Add-DiagEvent ('disk queue {0:N1} while CPU at {1:N0} percent' -f $queue, $cpu)
-            }
-            if ($availMb -lt 500) {
-                $script:DiagStats.LowMemEvents++
-                Add-DiagEvent ('low memory: only {0:N0} MB free' -f $availMb)
-            }
+    if ($listGames.Items.Count -ne $script:LastGameCount) {
+        $script:LastGameCount = $listGames.Items.Count
+        $names = @()
+        foreach ($item in $listGames.Items) {
+            $names += [System.IO.Path]::GetFileNameWithoutExtension([string]$item.Tag.ExePath)
         }
+        $state.GameNames = $names
+    }
 
-        if ($chkPingWatch.IsChecked) {
-            $script:DiagStats.TickCount++
-            if (($script:DiagStats.TickCount % 3) -eq 0) {
-                $targets = @('1.1.1.1')
-                try {
-                    $gateway = Get-NetIPConfiguration -ErrorAction SilentlyContinue |
-                        Where-Object { $null -ne $_.IPv4DefaultGateway } | Select-Object -First 1
-                    if ($null -ne $gateway) { $targets += $gateway.IPv4DefaultGateway.NextHop }
-                } catch { }
+    $txtMonitorStatus.Text = [string]$state.MonitorText
 
-                foreach ($target in $targets) {
-                    $replies = @(Test-Connection -ComputerName $target -Count 2 -ErrorAction SilentlyContinue)
-                    $script:DiagStats.PingsSent += 2
-                    $lost = 2 - $replies.Count
-                    $script:DiagStats.PingsLost += $lost
-                    if ($lost -gt 0) {
-                        Add-DiagEvent ('packet loss to {0}: {1} of 2 lost' -f $target, $lost)
-                    }
-                    foreach ($reply in $replies) {
-                        $script:DiagStats.PingSum += $reply.ResponseTime
-                        if ($reply.ResponseTime -gt $script:DiagStats.PingMax) { $script:DiagStats.PingMax = $reply.ResponseTime }
-                        if ($reply.ResponseTime -gt 100) {
-                            Add-DiagEvent ('ping spike to {0}: {1} ms' -f $target, $reply.ResponseTime)
-                        }
-                    }
-                }
-            }
-        }
-
-        if ($chkStutterWatch.IsChecked -or $chkPingWatch.IsChecked) {
-            $received = $script:DiagStats.PingsSent - $script:DiagStats.PingsLost
-            $avgPing = 0.0
-            if ($received -gt 0) { $avgPing = $script:DiagStats.PingSum / $received }
-
-            $lines = @()
-            $lines += ('STUTTER WATCH  samples {0} | DPC spikes {1} | disk queue spikes {2} | low mem events {3}' -f $script:DiagStats.Samples, $script:DiagStats.DpcSpikes, $script:DiagStats.QueueSpikes, $script:DiagStats.LowMemEvents)
-            $lines += ('PING WATCH     sent {0} | lost {1} ({2:N1} percent) | avg {3:N0} ms | max {4:N0} ms' -f $script:DiagStats.PingsSent, $script:DiagStats.PingsLost, $(if ($script:DiagStats.PingsSent -gt 0) { 100.0 * $script:DiagStats.PingsLost / $script:DiagStats.PingsSent } else { 0 }), $avgPing, $script:DiagStats.PingMax)
-            $lines += ''
-            $lines += 'RECENT EVENTS (oldest first):'
-            foreach ($entry in $script:DiagStats.Events) {
-                $lines += ('  ' + $entry)
-            }
-            if ($script:DiagStats.Events.Count -eq 0) {
-                $lines += '  (none, which is a good sign)'
-            }
-            $txtDiag.Text = ($lines -join [System.Environment]::NewLine)
-        }
-    } catch {
-        # perf counters unavailable on this system, monitor simply idles
+    $display = [string]$state.DisplayText
+    if ($display -and ($state.Stutter -or $state.Ping) -and $txtDiag.Text -ne $display) {
+        $txtDiag.Text = $display
     }
 }
 
@@ -4190,6 +4250,24 @@ try {
 # Detect nothing fancy here: closing the GUI always shuts the host console
 # down as well (see the end of this script). Set BALDYBEAST_KEEP_SHELL=1 first
 # if you are developing and want the shell to survive.
+
+# Pre-layout every tab so the first click on each one is instant
+try {
+    for ($t = 0; $t -lt $tabMain.Items.Count; $t++) {
+        $tabMain.SelectedIndex = $t
+        $window.UpdateLayout()
+    }
+    $tabMain.SelectedIndex = 0
+} catch { }
+
+# Ping targets for the packet loss monitor
+try {
+    $gw = Get-NetIPConfiguration -ErrorAction SilentlyContinue |
+        Where-Object { $null -ne $_.IPv4DefaultGateway } | Select-Object -First 1
+    if ($null -ne $gw) {
+        $script:WorkerState.PingTargets = @('1.1.1.1', $gw.IPv4DefaultGateway.NextHop)
+    }
+} catch { }
 
 Set-TweakAvailability
 Update-HardwareInfo
