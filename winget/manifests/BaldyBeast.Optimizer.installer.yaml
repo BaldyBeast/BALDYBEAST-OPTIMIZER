@@ -1,0 +1,16 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.6.0.schema.json
+# InstallerSha256 is a PLACEHOLDER. Run winget\build-release.ps1 and paste the
+# SHA256 it prints before submitting.
+PackageIdentifier: BaldyBeast.Optimizer
+PackageVersion: 1.2.0
+InstallerType: zip
+NestedInstallerType: portable
+NestedInstallerFiles:
+  - RelativeFilePath: BaldyBeast.Optimizer.exe
+    PortableCommandAlias: baldybeast
+Installers:
+  - Architecture: neutral
+    InstallerUrl: https://github.com/BaldyBeast/BALDYBEAST-OPTIMIZER/releases/download/v1.2.0/BaldyBeast.Optimizer-win.zip
+    InstallerSha256: 0000000000000000000000000000000000000000000000000000000000000000
+ManifestType: installer
+ManifestVersion: 1.6.0

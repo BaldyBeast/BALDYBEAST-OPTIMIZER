@@ -1,0 +1,27 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.6.0.schema.json
+PackageIdentifier: BaldyBeast.Optimizer
+PackageVersion: 1.2.0
+PackageLocale: en-US
+Publisher: BaldyBeast
+PublisherUrl: https://github.com/BaldyBeast
+PackageName: BALDYBEAST OPTIMIZER
+PackageUrl: https://github.com/BaldyBeast/BALDYBEAST-OPTIMIZER
+License: MIT
+LicenseUrl: https://github.com/BaldyBeast/BALDYBEAST-OPTIMIZER/blob/main/LICENSE
+ShortDescription: Windows 10/11 gaming optimization, debloat and cleanup utility.
+Description: >-
+  Single file Windows 10 and 11 gaming optimizer with gaming tweaks, debloat,
+  system cleanup, automatic rollback points, profiles, a startup manager,
+  network DNS tools and a hardware dashboard. Pure PowerShell and WPF, no
+  external dependencies.
+Moniker: baldybeast
+Tags:
+  - windows
+  - gaming
+  - optimizer
+  - debloat
+  - performance
+  - cleanup
+ReleaseNotesUrl: https://github.com/BaldyBeast/BALDYBEAST-OPTIMIZER/releases
+ManifestType: defaultLocale
+ManifestVersion: 1.6.0

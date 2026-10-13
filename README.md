@@ -26,10 +26,22 @@ Or clone the repo and run the file directly:
 powershell -ExecutionPolicy Bypass -File Optimize.ps1
 ```
 
+## What's new in v1.2
+
+- **Startup manager**: see everything that launches with Windows and disable it
+  with one click. Disabled entries are quarantined in a registry key, never
+  deleted, and the Backups tab brings them back.
+- **Network tab**: switch DNS between Cloudflare, Google, Quad9, AdGuard or
+  automatic, test latency to each resolver and your gateway, and set the
+  wireless adapter to Maximum Performance. DNS changes are rollback covered.
+- **winget packaging**: `winget/build-release.ps1` builds the release zip with a
+  tiny launcher exe, so the tool can go on the Windows package manager. See
+  `winget/README.md`.
+
 ## What's new in v1.1
 
 - **Rollback points**: every registry, service and scheduled task change is recorded
-  automatically before it is applied. The new Backups tab restores the exact previous
+  automatically before it is applied. The Backups tab restores the exact previous
   state of any session with one click.
 - **Risk badges and tooltips**: every option is color tagged Safe / Recommended /
   Advanced and hovering it explains in one plain sentence what it does.
@@ -68,9 +80,18 @@ powershell -ExecutionPolicy Bypass -File Optimize.ps1
 - Full cleanup in one click
 - Disable hibernation (frees hiberfil.sys)
 
+**Startup tab**
+- Every Run registry entry listed (HKCU, HKLM and 32-bit) with its command
+- Disable / enable with one click, quarantined not deleted
+
+**Network tab**
+- DNS switcher (Cloudflare, Google, Quad9, AdGuard, automatic)
+- Latency test to each resolver and your default gateway
+- Wireless adapter power saving to Maximum Performance
+
 **Safety**
 - "Create Restore Point" button at the top, offered again before the one-click preset
-- Automatic rollback points for every registry, service and task change
+- Automatic rollback points for every registry, service, task and DNS change
 - Every change is logged live in the GUI console and to `%TEMP%\BaldyBeast-Optimizer.log`
 - Confirmation dialogs before anything destructive
 - Gaming Services and Xbox Game Bar are kept so Game Pass and captures keep working
@@ -89,8 +110,8 @@ powershell -ExecutionPolicy Bypass -File Optimize.ps1
 - HAGS and power plan details need a restart to take effect.
 - Windows only allows one restore point every 10 hours. A recent existing point still protects you.
 - Bloatware removal is opt-in per category. Read the tooltips before you apply.
-- Rollback covers registry, services and scheduled tasks. App removals and power plan
-  switches are not covered there, use System Restore or reinstall the app for those.
+- Rollback covers registry, services, scheduled tasks and DNS. App removals and power
+  plan switches are not covered there, use System Restore or reinstall the app for those.
 
 ## License
 

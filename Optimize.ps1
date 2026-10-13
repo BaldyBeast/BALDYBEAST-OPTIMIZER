@@ -12,7 +12,7 @@
 
 $ErrorActionPreference = 'Continue'
 
-$script:AppVersion   = '1.1.0'
+$script:AppVersion   = '1.2.0'
 $script:RepoRawUrl   = 'https://raw.githubusercontent.com/BaldyBeast/BALDYBEAST-OPTIMIZER/main/Optimize.ps1'
 $script:LogFile      = Join-Path $env:TEMP 'BaldyBeast-Optimizer.log'
 $script:LogBox       = $null
@@ -644,6 +644,70 @@ $xamlB = @'
                   <Button x:Name="btnRefreshBackups" Style="{StaticResource DarkButton}" Content="Refresh List" Margin="0,0,8,0"/>
                   <Button x:Name="btnOpenBackupFolder" Style="{StaticResource DarkButton}" Content="Open Backup Folder"/>
                 </StackPanel>
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- ================= STARTUP ================= -->
+      <TabItem Header="Startup" Style="{StaticResource DarkTab}">
+        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="4">
+          <StackPanel>
+            <Border Style="{StaticResource Card}">
+              <StackPanel>
+                <TextBlock Style="{StaticResource CardHeader}" Text="Startup Programs"/>
+                <TextBlock Style="{StaticResource DimText}"
+                           Text="Programs that launch with Windows. Disabling one moves it to a quarantined registry key so it never starts again, and the Backups tab can restore it. Disabled entries show in amber."/>
+                <ListBox x:Name="listStartup" Height="300" Background="#FF0D0D14" Foreground="#FFE8E8F0"
+                         BorderBrush="#FF3A3A52" FontFamily="Consolas" FontSize="12"/>
+                <WrapPanel Margin="0,10,0,0">
+                  <Button x:Name="btnStartupDisable" Style="{StaticResource DangerButton}" Content="Disable Selected" Margin="0,0,8,8"/>
+                  <Button x:Name="btnStartupEnable" Style="{StaticResource AccentButton}" Content="Enable Selected" Margin="0,0,8,8"/>
+                  <Button x:Name="btnStartupRefresh" Style="{StaticResource DarkButton}" Content="Refresh" Margin="0,0,8,8"/>
+                  <Button x:Name="btnStartupFolder" Style="{StaticResource DarkButton}" Content="Open Startup Folder" Margin="0,0,8,8"/>
+                </WrapPanel>
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- ================= NETWORK ================= -->
+      <TabItem Header="Network" Style="{StaticResource DarkTab}">
+        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="4">
+          <StackPanel>
+            <Border Style="{StaticResource Card}">
+              <StackPanel>
+                <TextBlock Style="{StaticResource CardHeader}" Text="DNS Servers"/>
+                <TextBlock Style="{StaticResource DimText}"
+                           Text="Cloudflare is fastest for most people, Quad9 adds malware blocking. Every DNS change is recorded so the Backups tab can undo it."/>
+                <StackPanel Orientation="Horizontal">
+                  <ComboBox x:Name="cmbDnsProvider" Width="250" Padding="7" FontSize="13"
+                            Background="#FF0D0D14" Foreground="#FFE8E8F0" BorderBrush="#FF3A3A52">
+                    <ComboBoxItem Content="Cloudflare (1.1.1.1)" IsSelected="True"/>
+                    <ComboBoxItem Content="Google (8.8.8.8)"/>
+                    <ComboBoxItem Content="Quad9 (9.9.9.9)"/>
+                    <ComboBoxItem Content="AdGuard (94.140.14.14)"/>
+                    <ComboBoxItem Content="Automatic (DHCP)"/>
+                  </ComboBox>
+                  <Button x:Name="btnDnsApply" Style="{StaticResource AccentButton}" Content="Apply DNS" Margin="8,0,0,0"/>
+                  <Button x:Name="btnDnsTest" Style="{StaticResource DarkButton}" Content="Test Latency" Margin="8,0,0,0"/>
+                </StackPanel>
+              </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource Card}">
+              <StackPanel>
+                <TextBlock Style="{StaticResource CardHeader}" Text="Adapter and Latency"/>
+                <CheckBox x:Name="chkWirelessPower" Style="{StaticResource DarkCheck}"
+                          Content="Set wireless adapter power saving to Maximum Performance"/>
+                <Button x:Name="btnWirelessPower" Style="{StaticResource DarkButton}" Content="Apply Wireless Power Setting"
+                        HorizontalAlignment="Left" Margin="0,4,0,10"/>
+                <TextBox x:Name="txtNetwork" IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap"
+                         FontFamily="Consolas" FontSize="12" Background="#FF0D0D14" Foreground="#FFB8D8F0"
+                         BorderBrush="#FF3A3A52" Padding="10" MinHeight="190"
+                         VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"/>
               </StackPanel>
             </Border>
           </StackPanel>
@@ -1371,6 +1435,15 @@ function Restore-BackupFile {
                     }
                     Write-Log ('Reverted: task {0} restored' -f $rec.Name) 'OK'
                 }
+                'Dns' {
+                    if (@($rec.OldServers).Count -eq 0) {
+                        Set-DnsClientServerAddress -InterfaceIndex ([int]$rec.InterfaceIndex) -ResetServerAddresses -ErrorAction Stop
+                        Write-Log ('Reverted: DNS on {0} back to automatic' -f $rec.Name) 'OK'
+                    } else {
+                        Set-DnsClientServerAddress -InterfaceIndex ([int]$rec.InterfaceIndex) -ServerAddresses ([string[]]@($rec.OldServers)) -ErrorAction Stop
+                        Write-Log ('Reverted: DNS on {0} restored to {1}' -f $rec.Name, (@($rec.OldServers) -join ', ')) 'OK'
+                    }
+                }
             }
         } catch {
             Write-Log ('Revert step failed ({0}): {1}' -f $rec.Kind, $_.Exception.Message) 'ERROR'
@@ -1615,6 +1688,215 @@ function Install-Update {
 }
 
 # ----------------------------------------------------------------------------
+# Startup manager: Run registry entries, with quarantine instead of deletion
+# ----------------------------------------------------------------------------
+$script:DisabledRunSuffix = '-DisabledByBaldyBeast'
+
+function Get-StartupEntries {
+    $runPaths = @(
+        @{ Path = 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run'; Hive = 'HKCU'; Disabled = $false },
+        @{ Path = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run'; Hive = 'HKLM'; Disabled = $false },
+        @{ Path = 'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Run'; Hive = 'HKLM 32-bit'; Disabled = $false },
+        @{ Path = ('HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run' + $script:DisabledRunSuffix); Hive = 'HKCU'; Disabled = $true },
+        @{ Path = ('HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run' + $script:DisabledRunSuffix); Hive = 'HKLM'; Disabled = $true }
+    )
+
+    $entries = @()
+    foreach ($source in $runPaths) {
+        if (-not (Test-Path -LiteralPath $source.Path)) { continue }
+        $key = Get-Item -LiteralPath $source.Path -ErrorAction SilentlyContinue
+        if ($null -eq $key) { continue }
+        foreach ($valueName in $key.GetValueNames()) {
+            $entries += [pscustomobject]@{
+                Name     = $valueName
+                Command  = [string]$key.GetValue($valueName, '')
+                RunPath  = $source.Path
+                Hive     = $source.Hive
+                Disabled = $source.Disabled
+            }
+        }
+    }
+    return $entries
+}
+
+function Update-StartupList {
+    if ($null -eq $listStartup) { return }
+    $listStartup.Items.Clear()
+
+    foreach ($entry in (Get-StartupEntries)) {
+        $state = 'ON '
+        if ($entry.Disabled) { $state = 'OFF' }
+        $command = $entry.Command
+        if ($command.Length -gt 70) { $command = $command.Substring(0, 70) + '...' }
+
+        $item = New-Object System.Windows.Controls.ListBoxItem
+        $item.Content = ('[{0}] {1,-24} {2}' -f $state, $entry.Name, $command)
+        $item.Tag = $entry
+        if ($entry.Disabled) { $item.Foreground = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.ColorConverter]::ConvertFromString('#FFF5A97F')) }
+        [void]$listStartup.Items.Add($item)
+    }
+    Write-Log ('Startup list refreshed: {0} entries' -f $listStartup.Items.Count)
+}
+
+function Disable-StartupEntry {
+    param([Parameter(Mandatory = $true)]$Entry)
+
+    $disabledPath = $Entry.RunPath + $script:DisabledRunSuffix
+    try {
+        Backup-RegValue -Path $Entry.RunPath -Name $Entry.Name
+        Backup-RegValue -Path $disabledPath -Name $Entry.Name
+
+        Set-RegValue -Path $disabledPath -Name $Entry.Name -Value $Entry.Command -Type 'String' | Out-Null
+        Remove-ItemProperty -LiteralPath $Entry.RunPath -Name $Entry.Name -Force -ErrorAction Stop
+        Write-Log ('Startup entry disabled: {0}' -f $Entry.Name) 'OK'
+    } catch {
+        Write-Log ('Could not disable {0}: {1}' -f $Entry.Name, $_.Exception.Message) 'ERROR'
+    }
+}
+
+function Enable-StartupEntry {
+    param([Parameter(Mandatory = $true)]$Entry)
+
+    $livePath = $Entry.RunPath -replace [regex]::Escape($script:DisabledRunSuffix), ''
+    try {
+        Backup-RegValue -Path $Entry.RunPath -Name $Entry.Name
+        Backup-RegValue -Path $livePath -Name $Entry.Name
+
+        Set-RegValue -Path $livePath -Name $Entry.Name -Value $Entry.Command -Type 'String' | Out-Null
+        Remove-ItemProperty -LiteralPath $Entry.RunPath -Name $Entry.Name -Force -ErrorAction Stop
+        Write-Log ('Startup entry enabled: {0}' -f $Entry.Name) 'OK'
+    } catch {
+        Write-Log ('Could not enable {0}: {1}' -f $Entry.Name, $_.Exception.Message) 'ERROR'
+    }
+}
+
+# ----------------------------------------------------------------------------
+# Network: DNS switching, latency test, wireless power saving
+# ----------------------------------------------------------------------------
+function Get-NetworkSummary {
+    $lines = @()
+    try {
+        $adapters = @(Get-NetAdapter -ErrorAction Stop | Where-Object { $_.Status -eq 'Up' })
+        if ($adapters.Count -eq 0) {
+            $lines += 'No active network adapter found.'
+            return $lines
+        }
+
+        foreach ($adapter in $adapters) {
+            $ipv4 = Get-DnsClientServerAddress -InterfaceIndex $adapter.ifIndex -AddressFamily IPv4 -ErrorAction SilentlyContinue
+            $dnsList = 'automatic (DHCP)'
+            if ($null -ne $ipv4 -and @($ipv4.ServerAddresses).Count -gt 0) {
+                $dnsList = (@($ipv4.ServerAddresses) -join ', ')
+            }
+            $lines += ('Adapter  {0,-16} DNS: {1}' -f $adapter.Name, $dnsList)
+        }
+
+        $gateway = Get-NetIPConfiguration -ErrorAction SilentlyContinue |
+            Where-Object { $null -ne $_.IPv4DefaultGateway } |
+            Select-Object -First 1
+        if ($null -ne $gateway) {
+            $lines += ('Gateway  {0}' -f $gateway.IPv4DefaultGateway.NextHop)
+        }
+    } catch {
+        $lines += ('Network read failed: {0}' -f $_.Exception.Message)
+    }
+    return $lines
+}
+
+function Set-DnsProvider {
+    param([Parameter(Mandatory = $true)][string]$ProviderName)
+
+    $serverSets = @{
+        'Cloudflare' = @('1.1.1.1', '1.0.0.1')
+        'Google'     = @('8.8.8.8', '8.8.4.4')
+        'Quad9'      = @('9.9.9.9', '149.112.112.112')
+        'AdGuard'    = @('94.140.14.14', '94.140.15.15')
+    }
+
+    try {
+        $adapters = @(Get-NetAdapter -ErrorAction Stop | Where-Object { $_.Status -eq 'Up' })
+        foreach ($adapter in $adapters) {
+            $current = Get-DnsClientServerAddress -InterfaceIndex $adapter.ifIndex -AddressFamily IPv4 -ErrorAction SilentlyContinue
+            $oldServers = @()
+            if ($null -ne $current) { $oldServers = @($current.ServerAddresses) }
+
+            Add-BackupRecord -Record @{
+                Kind           = 'Dns'
+                Name           = $adapter.Name
+                InterfaceIndex = [int]$adapter.ifIndex
+                OldServers     = $oldServers
+            }
+
+            if ($ProviderName -eq 'Automatic') {
+                Set-DnsClientServerAddress -InterfaceIndex $adapter.ifIndex -ResetServerAddresses -ErrorAction Stop
+                Write-Log ('DNS on {0} reset to automatic' -f $adapter.Name) 'OK'
+            } else {
+                Set-DnsClientServerAddress -InterfaceIndex $adapter.ifIndex -ServerAddresses $serverSets[$ProviderName] -ErrorAction Stop
+                Write-Log ('DNS on {0} set to {1}: {2}' -f $adapter.Name, $ProviderName, ($serverSets[$ProviderName] -join ', ')) 'OK'
+            }
+        }
+        Clear-DnsCache
+    } catch {
+        Write-Log ('DNS change failed: {0}' -f $_.Exception.Message) 'ERROR'
+    }
+}
+
+function Test-NetworkLatency {
+    $targets = [ordered]@{
+        'Cloudflare 1.1.1.1' = '1.1.1.1'
+        'Google 8.8.8.8'     = '8.8.8.8'
+        'Quad9 9.9.9.9'      = '9.9.9.9'
+        'Microsoft 4.2.2.1'  = '4.2.2.1'
+    }
+
+    try {
+        $gateway = Get-NetIPConfiguration -ErrorAction SilentlyContinue |
+            Where-Object { $null -ne $_.IPv4DefaultGateway } |
+            Select-Object -First 1
+        if ($null -ne $gateway) {
+            $targets['Default gateway'] = $gateway.IPv4DefaultGateway.NextHop
+        }
+    } catch { }
+
+    $lines = @()
+    $lines += ('Latency test at {0} (3 pings each)' -f (Get-Date -Format 'HH:mm:ss'))
+    $lines += ''
+
+    foreach ($label in $targets.Keys) {
+        $address = $targets[$label]
+        try {
+            $replies = @(Test-Connection -ComputerName $address -Count 3 -ErrorAction SilentlyContinue)
+            if ($replies.Count -gt 0) {
+                $avg = [math]::Round(($replies | Measure-Object -Property ResponseTime -Average).Average, 1)
+                $lines += ('{0,-22} {1,6} ms avg   ({2}/{3} replies)' -f $label, $avg, $replies.Count, 3)
+            } else {
+                $lines += ('{0,-22} timeout or blocked' -f $label)
+            }
+        } catch {
+            $lines += ('{0,-22} failed: {1}' -f $label, $_.Exception.Message)
+        }
+    }
+
+    $lines += ''
+    $lines += 'Lower is better. Under 20 ms is great for gaming DNS.'
+    $txtNetwork.Text = ($lines -join [System.Environment]::NewLine)
+    Write-Log 'Latency test finished' 'OK'
+}
+
+function Set-WirelessMaxPerformance {
+    Write-Log 'Setting wireless adapter power saving to Maximum Performance...'
+    # Wireless Adapter Settings subgroup and Power Saving Mode setting
+    & powercfg.exe /setacvalueindex scheme_current 19cbb8fa-5279-450e-9fac-8a3d5fedd0c1 12bbebe6-58d6-4636-95bb-3217ef867c1a 0 2>$null | Out-Null
+    & powercfg.exe /setdcvalueindex scheme_current 19cbb8fa-5279-450e-9fac-8a3d5fedd0c1 12bbebe6-58d6-4636-95bb-3217ef867c1a 0 2>$null | Out-Null
+    & powercfg.exe /setactive scheme_current 2>$null | Out-Null
+    if ($LASTEXITCODE -eq 0) {
+        Write-Log 'Wireless power saving set to Maximum Performance on AC and battery' 'OK'
+    } else {
+        Write-Log 'Could not change the wireless power setting on this system' 'WARN'
+    }
+}
+
+# ----------------------------------------------------------------------------
 # Build the WPF window
 # ----------------------------------------------------------------------------
 Add-Type -AssemblyName PresentationFramework
@@ -1655,7 +1937,9 @@ $controlNames = @(
     'txtProfileName', 'listProfiles', 'btnSaveProfile', 'btnLoadProfile', 'btnDeleteProfile',
     'btnPresetCompetitive', 'btnPresetStreaming', 'btnPresetCleanInstall', 'btnPresetUncheckAll',
     'listBackups', 'btnRevertBackup', 'btnRefreshBackups', 'btnOpenBackupFolder',
-    'btnCheckUpdate', 'btnDoUpdate', 'txtUpdateStatus'
+    'btnCheckUpdate', 'btnDoUpdate', 'txtUpdateStatus',
+    'listStartup', 'btnStartupDisable', 'btnStartupEnable', 'btnStartupRefresh', 'btnStartupFolder',
+    'cmbDnsProvider', 'btnDnsApply', 'btnDnsTest', 'chkWirelessPower', 'btnWirelessPower', 'txtNetwork'
 )
 
 $missingNames = @()
@@ -1694,6 +1978,11 @@ Rollback:
 Profiles:
   Save your checkbox selection as a JSON profile in
   %LOCALAPPDATA%\BaldyBeast\profiles and share the file with friends.
+
+Startup and Network:
+  The Startup tab disables programs that launch with Windows (quarantined in the
+  registry, never deleted). The Network tab switches DNS providers and tests
+  latency so you can pick the fastest resolver for your line.
 
 One line install from GitHub:
   irm "$($script:RepoRawUrl)" | iex
@@ -1831,6 +2120,51 @@ $btnDoUpdate.Add_Click({
     }
 })
 
+$btnStartupRefresh.Add_Click({ Update-StartupList })
+$btnStartupFolder.Add_Click({
+    $startupFolder = [Environment]::GetFolderPath('Startup')
+    Start-Process -FilePath 'explorer.exe' -ArgumentList $startupFolder
+})
+$btnStartupDisable.Add_Click({
+    if ($null -eq $listStartup.SelectedItem) {
+        Write-Log 'Select a startup entry first' 'WARN'
+        return
+    }
+    $entry = [pscustomobject]$listStartup.SelectedItem.Tag
+    if ($entry.Disabled) {
+        Write-Log ('{0} is already disabled' -f $entry.Name) 'WARN'
+        return
+    }
+    if (Confirm-Action 'Disable startup entry' ('Stop "{0}" from starting with Windows? You can enable it again at any time.' -f $entry.Name)) {
+        Disable-StartupEntry -Entry $entry
+        Update-StartupList
+    }
+})
+$btnStartupEnable.Add_Click({
+    if ($null -eq $listStartup.SelectedItem) {
+        Write-Log 'Select a startup entry first' 'WARN'
+        return
+    }
+    $entry = [pscustomobject]$listStartup.SelectedItem.Tag
+    if (-not $entry.Disabled) {
+        Write-Log ('{0} is already enabled' -f $entry.Name) 'WARN'
+        return
+    }
+    Enable-StartupEntry -Entry $entry
+    Update-StartupList
+})
+
+$btnDnsApply.Add_Click({
+    $providerLabels = @('Cloudflare', 'Google', 'Quad9', 'AdGuard', 'Automatic')
+    $providerName = $providerLabels[$cmbDnsProvider.SelectedIndex]
+    if (Confirm-Action 'Change DNS' ('Switch DNS on all active adapters to {0}?' -f $providerName)) {
+        Set-DnsProvider -ProviderName $providerName
+        $txtNetwork.Text = ((Get-NetworkSummary) -join [System.Environment]::NewLine)
+    }
+})
+$btnDnsTest.Add_Click({ Test-NetworkLatency })
+$btnWirelessPower.Add_Click({ Set-WirelessMaxPerformance })
+
 # ----------------------------------------------------------------------------
 # Startup log
 # ----------------------------------------------------------------------------
@@ -1883,6 +2217,7 @@ $script:TweakInfo = @{
     'chkCopilot'        = @('Recommended', 'Disables the Windows Copilot button and feature.')
     'chkRecall'         = @('Recommended', 'Prevents Windows Recall from snapshotting your screen and disables AI data analysis.')
     'chkOneDrive'       = @('Advanced', 'Stops OneDrive from starting with Windows. Your files are untouched and you can re-enable it anytime.')
+    'chkWirelessPower'  = @('Recommended', 'Stops Windows from lowering wireless adapter power, which keeps ping and packet loss steadier on WiFi. Uses a bit more battery on laptops.')
 }
 
 foreach ($infoEntry in $script:TweakInfo.GetEnumerator()) {
@@ -1899,6 +2234,8 @@ foreach ($infoEntry in $script:TweakInfo.GetEnumerator()) {
 Update-HardwareInfo
 Update-ProfileList
 Update-BackupList
+Update-StartupList
+$txtNetwork.Text = ((Get-NetworkSummary) -join [System.Environment]::NewLine)
 Test-ForUpdate
 
 # ----------------------------------------------------------------------------
@@ -1966,6 +2303,20 @@ if ($script:ValidateMode) {
         $probe.IsChecked = $false
     } catch {
         Write-Host ('PROFILE TEST FAILED: {0}' -f $_.Exception.Message) -ForegroundColor Red
+    }
+
+    # Read-only smoke tests for the v1.2 tabs
+    try {
+        $startupEntries = @(Get-StartupEntries)
+        Write-Host ('STARTUP TEST OK - {0} startup entries discovered' -f $startupEntries.Count) -ForegroundColor Green
+    } catch {
+        Write-Host ('STARTUP TEST FAILED: {0}' -f $_.Exception.Message) -ForegroundColor Red
+    }
+    try {
+        $networkLines = @(Get-NetworkSummary)
+        Write-Host ('NETWORK TEST OK - {0} summary lines produced' -f $networkLines.Count) -ForegroundColor Green
+    } catch {
+        Write-Host ('NETWORK TEST FAILED: {0}' -f $_.Exception.Message) -ForegroundColor Red
     }
 
     if ($missingNames.Count -gt 0) {
