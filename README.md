@@ -26,6 +26,23 @@ Or clone the repo and run the file directly:
 powershell -ExecutionPolicy Bypass -File Optimize.ps1
 ```
 
+## What's new in v1.3
+
+- **Benchmark tab**: CPU single and multi thread, memory copy and disk tests in
+  about 10 seconds. Save a baseline, apply your tweaks, run again and compare
+  with real percentages. No fake FPS claims, just measurements.
+- **Memory panel (RAMMap style)**: standby cache, modified page list and cache
+  breakdown plus top processes by working set, and a Purge Standby List button
+  that releases cached file pages instantly (same mechanism RAMMap and ISLC
+  use, built in, no external tools).
+- **Recommended tab**: taskbar tweaks (left alignment, hide search box, hide
+  Task View button) and a display refresh rate reminder with a one click jump
+  into Windows Display settings.
+- **Support bundle**: one button zips hardware info, tweak selection, benchmark
+  results and the log onto your Desktop for GitHub issues.
+- **Desktop shortcut**: stop typing the one-liner.
+- **Classic right-click menu** toggle for Windows 11.
+
 ## What's new in v1.2
 
 - **Startup manager**: see everything that launches with Windows and disable it
@@ -73,12 +90,18 @@ powershell -ExecutionPolicy Bypass -File Optimize.ps1
 - Consumer experiences, suggested apps and Start menu ads disabled
 - Activity history, Widgets, Copilot and Windows Recall disabled
 - OneDrive autostart entry removed (files untouched)
+- Classic Windows 11 right-click menu toggle
 
 **System Clean tab**
 - Temp files, Windows Update cache, prefetch, Delivery Optimization cache, error reports
 - Recycle Bin, DNS cache
 - Full cleanup in one click
 - Disable hibernation (frees hiberfil.sys)
+
+**Hardware tab**
+- Full system readout: OS, CPU, GPU, driver, memory, disks, page file, uptime, power plan
+- RAMMap style memory breakdown and top processes by working set
+- Purge Standby List button
 
 **Startup tab**
 - Every Run registry entry listed (HKCU, HKLM and 32-bit) with its command
@@ -88,6 +111,14 @@ powershell -ExecutionPolicy Bypass -File Optimize.ps1
 - DNS switcher (Cloudflare, Google, Quad9, AdGuard, automatic)
 - Latency test to each resolver and your default gateway
 - Wireless adapter power saving to Maximum Performance
+
+**Benchmark tab**
+- CPU single and multi thread, memory copy, disk write and read
+- Baseline save and compare with percentage deltas
+
+**Recommended tab**
+- Taskbar left alignment, hide search box, hide Task View button
+- Display refresh rate reminder and shortcut into Display settings
 
 **Safety**
 - "Create Restore Point" button at the top, offered again before the one-click preset
@@ -112,7 +143,8 @@ powershell -ExecutionPolicy Bypass -File Optimize.ps1
 - Bloatware removal is opt-in per category. Read the tooltips before you apply.
 - Rollback covers registry, services, scheduled tasks and DNS. App removals and power
   plan switches are not covered there, use System Restore or reinstall the app for those.
+- Benchmark scores only compare on the same machine and PowerShell version.
 
 ## License
 
-MIT. Use at your own risk.
+MIT. Copyright (c) 2026 BaldyBeast. Use at your own risk.

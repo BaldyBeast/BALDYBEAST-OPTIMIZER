@@ -7,12 +7,12 @@
     Run from GitHub: irm "https://raw.githubusercontent.com/BaldyBeast/BALDYBEAST-OPTIMIZER/main/Optimize.ps1" | iex
 
     Single file. No external DLLs. Pure PowerShell + WPF.
-    Author: BaldyBeast   License: MIT
+    Copyright (c) 2026 BaldyBeast. All rights reserved. License: MIT
 #>
 
 $ErrorActionPreference = 'Continue'
 
-$script:AppVersion   = '1.2.0'
+$script:AppVersion   = '1.3.0'
 $script:RepoRawUrl   = 'https://raw.githubusercontent.com/BaldyBeast/BALDYBEAST-OPTIMIZER/main/Optimize.ps1'
 $script:LogFile      = Join-Path $env:TEMP 'BaldyBeast-Optimizer.log'
 $script:LogBox       = $null
@@ -519,6 +519,8 @@ $xamlB = @'
                           Content="Disable Windows Recall and AI data analysis"/>
                 <CheckBox x:Name="chkOneDrive" Style="{StaticResource DarkCheck}"
                           Content="Remove OneDrive autostart entry (files stay untouched)"/>
+                <CheckBox x:Name="chkClassicMenu" Style="{StaticResource DarkCheck}"
+                          Content="Windows 11 classic right-click menu (needs Explorer restart)"/>
               </StackPanel>
             </Border>
 
@@ -581,6 +583,22 @@ $xamlB = @'
                          VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"/>
                 <Button x:Name="btnRefreshHw" Style="{StaticResource DarkButton}" Content="Refresh"
                         HorizontalAlignment="Left" Margin="0,10,0,0"/>
+              </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource Card}">
+              <StackPanel>
+                <TextBlock Style="{StaticResource CardHeader}" Text="Memory (RAMMap style)"/>
+                <TextBlock Style="{StaticResource DimText}"
+                           Text="Standby list is file data Windows keeps cached in RAM. Purging it frees that cache instantly, which can smooth stutter when a game needs memory right now. Windows re-fills the cache afterwards, so app launches may feel slightly slower for a while."/>
+                <WrapPanel>
+                  <Button x:Name="btnPurgeStandby" Style="{StaticResource DangerButton}" Content="Purge Standby List" Margin="0,0,8,8"/>
+                  <Button x:Name="btnMemoryRefresh" Style="{StaticResource DarkButton}" Content="Refresh Memory Info" Margin="0,0,8,8"/>
+                </WrapPanel>
+                <TextBox x:Name="txtMemory" IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap"
+                         FontFamily="Consolas" FontSize="12" Background="#FF0D0D14" Foreground="#FFB8D8F0"
+                         BorderBrush="#FF3A3A52" Padding="10" MinHeight="230" Margin="0,6,0,0"
+                         VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"/>
               </StackPanel>
             </Border>
           </StackPanel>
@@ -714,6 +732,63 @@ $xamlB = @'
         </ScrollViewer>
       </TabItem>
 
+      <!-- ================= BENCHMARK ================= -->
+      <TabItem Header="Benchmark" Style="{StaticResource DarkTab}">
+        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="4">
+          <StackPanel>
+            <Border Style="{StaticResource Card}">
+              <StackPanel>
+                <TextBlock Style="{StaticResource CardHeader}" Text="Performance Benchmark"/>
+                <TextBlock Style="{StaticResource DimText}"
+                           Text="Runs CPU, memory and disk tests in about 10 seconds. The honest way to use it: run it, save a baseline, apply your tweaks, run it again and compare. Scores only compare on the same machine and PowerShell version."/>
+                <WrapPanel>
+                  <Button x:Name="btnBenchRun" Style="{StaticResource AccentButton}" Content="Run Benchmark" Margin="0,0,8,8"/>
+                  <Button x:Name="btnBenchSave" Style="{StaticResource DarkButton}" Content="Save as Baseline" Margin="0,0,8,8"/>
+                  <Button x:Name="btnBenchCompare" Style="{StaticResource DarkButton}" Content="Compare to Baseline" Margin="0,0,8,8"/>
+                  <Button x:Name="btnBenchOpen" Style="{StaticResource DarkButton}" Content="Open Results Folder" Margin="0,0,8,8"/>
+                </WrapPanel>
+                <TextBox x:Name="txtBenchmark" IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap"
+                         FontFamily="Consolas" FontSize="12" Background="#FF0D0D14" Foreground="#FFB8D8F0"
+                         BorderBrush="#FF3A3A52" Padding="10" MinHeight="240" Margin="0,8,0,0"
+                         VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"/>
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- ================= RECOMMENDED ================= -->
+      <TabItem Header="Recommended" Style="{StaticResource DarkTab}">
+        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="4">
+          <StackPanel>
+            <Border Style="{StaticResource Card}">
+              <StackPanel>
+                <TextBlock Style="{StaticResource CardHeader}" Text="Taskbar (recommended layout)"/>
+                <CheckBox x:Name="chkTaskbarLeft" Style="{StaticResource DarkCheck}"
+                          Content="Align the taskbar to the left (classic position)"/>
+                <CheckBox x:Name="chkTaskbarSearch" Style="{StaticResource DarkCheck}"
+                          Content="Hide the taskbar search box"/>
+                <CheckBox x:Name="chkTaskbarTaskView" Style="{StaticResource DarkCheck}"
+                          Content="Hide the Task View button"/>
+                <TextBlock Style="{StaticResource DimText}"
+                           Text="These are pure preference settings, so nothing changes until you press Apply. Taskbar changes show up after Explorer restarts or you sign out."/>
+                <Button x:Name="btnApplyRecommended" Style="{StaticResource AccentButton}"
+                        Content="Apply Selected Taskbar Settings" HorizontalAlignment="Left" Margin="0,4,0,0"/>
+              </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource Card}">
+              <StackPanel>
+                <TextBlock Style="{StaticResource CardHeader}" Text="Display Refresh Rate"/>
+                <TextBlock Style="{StaticResource DimText}"
+                           Text="Many gaming monitors run at 60 Hz out of the box even when they support 144 Hz or more. Check Display settings, open Advanced display, and pick the highest refresh rate your monitor offers. This is one of the biggest free wins for smoothness and it takes ten seconds."/>
+                <Button x:Name="btnOpenDisplay" Style="{StaticResource DarkButton}" Content="Open Display Settings" HorizontalAlignment="Left"/>
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
       <!-- ================= ABOUT ================= -->
       <TabItem Header="About" Style="{StaticResource DarkTab}">
         <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="4">
@@ -725,6 +800,10 @@ $xamlB = @'
                 <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
                   <Button x:Name="btnCheckUpdate" Style="{StaticResource DarkButton}" Content="Check for Updates" Margin="0,0,8,0"/>
                   <Button x:Name="btnDoUpdate" Style="{StaticResource AccentButton}" Content="Download and Restart" IsEnabled="False"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                  <Button x:Name="btnExportBundle" Style="{StaticResource DarkButton}" Content="Export Support Bundle" Margin="0,0,8,0"/>
+                  <Button x:Name="btnMakeShortcut" Style="{StaticResource DarkButton}" Content="Create Desktop Shortcut"/>
                 </StackPanel>
                 <TextBlock x:Name="txtUpdateStatus" Style="{StaticResource DimText}" Text="Update status: not checked yet"/>
               </StackPanel>
@@ -1098,6 +1177,7 @@ function Invoke-DebloatTweaks {
     if ($chkCopilot.IsChecked)        { Disable-Copilot }
     if ($chkRecall.IsChecked)         { Disable-Recall }
     if ($chkOneDrive.IsChecked)       { Disable-OneDriveAutostart }
+    if ($chkClassicMenu.IsChecked)    { Enable-ClassicContextMenu }
     Write-Log '===== Debloat and Services: done =====' 'OK'
 }
 
@@ -1254,7 +1334,7 @@ function Start-OptimizeAll {
         'chkHAGS', 'chkMmcss', 'chkUsbSuspend', 'chkVisualFx',
         'chkBloatBing', 'chkBloat3D', 'chkBloatGames', 'chkBloatCortana',
         'chkTelemetry', 'chkServices', 'chkCortana', 'chkBackgroundApps',
-        'chkConsumer', 'chkActivity', 'chkWidgets', 'chkCopilot', 'chkRecall'
+        'chkConsumer', 'chkActivity', 'chkWidgets', 'chkCopilot', 'chkRecall', 'chkClassicMenu'
     )
     foreach ($controlName in $recommended) {
         $control = $script:Window.FindName($controlName)
@@ -1482,7 +1562,8 @@ function Get-AllTweakNames {
         'chkHAGS', 'chkMmcss', 'chkUsbSuspend', 'chkVisualFx',
         'chkBloatBing', 'chkBloat3D', 'chkBloatGames', 'chkBloatMisc', 'chkBloatCortana',
         'chkTelemetry', 'chkServices', 'chkCortana', 'chkBackgroundApps',
-        'chkConsumer', 'chkActivity', 'chkWidgets', 'chkCopilot', 'chkRecall', 'chkOneDrive'
+        'chkConsumer', 'chkActivity', 'chkWidgets', 'chkCopilot', 'chkRecall', 'chkOneDrive', 'chkClassicMenu',
+        'chkTaskbarLeft', 'chkTaskbarSearch', 'chkTaskbarTaskView'
     )
 }
 
@@ -1672,7 +1753,11 @@ function Test-ForUpdate {
 function Install-Update {
     try {
         $raw = Invoke-RestMethod -Uri $script:RepoRawUrl -TimeoutSec 20 -ErrorAction Stop
-        if ([string]$raw -notmatch 'BALDYBEAST OPTIMIZER') {
+        # Integrity sanity check: refuse to run anything that does not look like this tool
+        $rawText = [string]$raw
+        if ($rawText -notmatch 'BALDYBEAST OPTIMIZER' -or
+            $rawText -notmatch 'Get-BaldyBanner' -or
+            $rawText -notmatch "AppVersion\s*=\s*'") {
             throw 'downloaded file failed the content check'
         }
 
@@ -1897,6 +1982,520 @@ function Set-WirelessMaxPerformance {
 }
 
 # ----------------------------------------------------------------------------
+# Benchmark: CPU single, CPU multi, memory copy, disk write/read
+# Scores are only comparable on the same machine and the same PowerShell
+# version. Run before and after your tweaks to see real deltas.
+# ----------------------------------------------------------------------------
+$script:BenchmarkDir      = Join-Path $env:LOCALAPPDATA 'BaldyBeast\benchmarks'
+$script:LastBenchFile     = Join-Path $script:BenchmarkDir 'last.json'
+$script:BaselineBenchFile = Join-Path $script:BenchmarkDir 'baseline.json'
+
+function Invoke-CpuSingleWork {
+    param([int]$Rounds)
+    $sw = [System.Diagnostics.Stopwatch]::StartNew()
+    $acc = 0
+    for ($i = 1; $i -le $Rounds; $i++) {
+        $acc = ($acc + $i * 7) % 1000000007
+    }
+    $sw.Stop()
+    return $sw.Elapsed.TotalMilliseconds
+}
+
+function Invoke-CpuMultiWork {
+    param(
+        [int]$Rounds,
+        [int]$Threads
+    )
+
+    $work = {
+        param([int]$n)
+        $sw = [System.Diagnostics.Stopwatch]::StartNew()
+        $acc = 0
+        for ($i = 1; $i -le $n; $i++) {
+            $acc = ($acc + $i * 7) % 1000000007
+        }
+        $sw.Stop()
+        return $sw.Elapsed.TotalMilliseconds
+    }
+
+    $pool = [runspacefactory]::CreateRunspacePool(1, $Threads)
+    $pool.Open()
+    $pipes = @()
+    for ($t = 0; $t -lt $Threads; $t++) {
+        $ps = [powershell]::Create()
+        $ps.RunspacePool = $pool
+        [void]$ps.AddScript($work).AddArgument($Rounds)
+        $pipes += [pscustomobject]@{ Pipe = $ps; Handle = $ps.BeginInvoke() }
+    }
+
+    $slowestMs = 0.0
+    foreach ($entry in $pipes) {
+        $result = $entry.Pipe.EndInvoke($entry.Handle)
+        $ms = [double]$result[0]
+        if ($ms -gt $slowestMs) { $slowestMs = $ms }
+        $entry.Pipe.Dispose()
+    }
+    $pool.Close()
+    return $slowestMs
+}
+
+function Invoke-MemoryWork {
+    param([int]$SizeMB = 256)
+
+    $size = [int]($SizeMB * 1MB)
+    $source = New-Object byte[] $size
+    $target = New-Object byte[] $size
+    $rng = New-Object System.Random
+    $rng.NextBytes($source)
+
+    $sw = [System.Diagnostics.Stopwatch]::StartNew()
+    [System.Buffer]::BlockCopy($source, 0, $target, 0, $size)
+    $sw.Stop()
+
+    $seconds = [math]::Max($sw.Elapsed.TotalSeconds, 0.0001)
+    return [math]::Round(($SizeMB / $seconds), 0)
+}
+
+function Invoke-DiskWork {
+    param(
+        [string]$Path,
+        [int]$SizeMB = 256
+    )
+
+    $file = Join-Path $Path ('bb-bench-{0}.tmp' -f ([guid]::NewGuid().ToString('N').Substring(0, 6)))
+    $chunk = New-Object byte[] (1MB)
+    $rng = New-Object System.Random
+    $rng.NextBytes($chunk)
+
+    $writeMs = 0.0
+    $readMs = 0.0
+    try {
+        $sw = [System.Diagnostics.Stopwatch]::StartNew()
+        $stream = New-Object System.IO.FileStream($file, [System.IO.FileMode]::Create, [System.IO.FileAccess]::Write)
+        try {
+            for ($i = 0; $i -lt $SizeMB; $i++) {
+                $stream.Write($chunk, 0, $chunk.Length)
+            }
+            $stream.Flush($true)
+        } finally {
+            $stream.Close()
+        }
+        $sw.Stop()
+        $writeMs = $sw.Elapsed.TotalMilliseconds
+
+        $sw = [System.Diagnostics.Stopwatch]::StartNew()
+        $stream = New-Object System.IO.FileStream($file, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read)
+        try {
+            $readBuffer = New-Object byte[] (1MB)
+            $read = 1
+            while ($read -gt 0) {
+                $read = $stream.Read($readBuffer, 0, $readBuffer.Length)
+            }
+        } finally {
+            $stream.Close()
+        }
+        $sw.Stop()
+        $readMs = $sw.Elapsed.TotalMilliseconds
+    } finally {
+        Remove-Item -LiteralPath $file -Force -ErrorAction SilentlyContinue
+    }
+
+    return [pscustomobject]@{
+        WriteMBps = [math]::Round(($SizeMB / ([math]::Max($writeMs, 0.0001) / 1000)), 0)
+        ReadMBps  = [math]::Round(($SizeMB / ([math]::Max($readMs, 0.0001) / 1000)), 0)
+    }
+}
+
+function Start-Benchmark {
+    Write-Log 'Benchmark started, this takes about 10 seconds...'
+    $txtBenchmark.Text = 'Running benchmark, please wait...'
+    Update-Ui
+
+    $threads = [Environment]::ProcessorCount
+    $cpuRounds = 2000000
+
+    $results = [ordered]@{
+        Timestamp    = (Get-Date).ToString('s')
+        PsVersion    = $PSVersionTable.PSVersion.ToString()
+        CpuName      = ''
+        Threads      = $threads
+        CpuSingleMs  = 0.0
+        CpuSingleIters = 0.0
+        CpuMultiIters  = 0.0
+        MemMBps      = 0.0
+        DiskWriteMBps = 0.0
+        DiskReadMBps  = 0.0
+    }
+
+    try {
+        $cpu = Get-CimInstance -ClassName Win32_Processor -ErrorAction Stop | Select-Object -First 1
+        $results.CpuName = $cpu.Name
+    } catch {
+        $results.CpuName = 'unknown'
+    }
+
+    try {
+        $txtBenchmark.Text = 'Running CPU single thread test...'
+        Update-Ui
+        $singleMs = Invoke-CpuSingleWork -Rounds $cpuRounds
+        $results.CpuSingleMs = [math]::Round($singleMs, 1)
+        $results.CpuSingleIters = [math]::Round(($cpuRounds / ([math]::Max($singleMs, 0.0001) / 1000)), 0)
+    } catch {
+        Write-Log ('CPU single test failed: {0}' -f $_.Exception.Message) 'ERROR'
+    }
+
+    try {
+        $txtBenchmark.Text = ('Running CPU multi thread test ({0} threads)...' -f $threads)
+        Update-Ui
+        $multiMs = Invoke-CpuMultiWork -Rounds $cpuRounds -Threads $threads
+        $results.CpuMultiIters = [math]::Round((($cpuRounds * $threads) / ([math]::Max($multiMs, 0.0001) / 1000)), 0)
+    } catch {
+        Write-Log ('CPU multi test failed: {0}' -f $_.Exception.Message) 'ERROR'
+    }
+
+    try {
+        $txtBenchmark.Text = 'Running memory copy test...'
+        Update-Ui
+        $results.MemMBps = Invoke-MemoryWork -SizeMB 256
+    } catch {
+        Write-Log ('Memory test failed: {0}' -f $_.Exception.Message) 'ERROR'
+    }
+
+    try {
+        $txtBenchmark.Text = 'Running disk write and read test...'
+        Update-Ui
+        $disk = Invoke-DiskWork -Path $env:TEMP -SizeMB 256
+        $results.DiskWriteMBps = $disk.WriteMBps
+        $results.DiskReadMBps = $disk.ReadMBps
+    } catch {
+        Write-Log ('Disk test failed: {0}' -f $_.Exception.Message) 'ERROR'
+    }
+
+    try {
+        if (-not (Test-Path -LiteralPath $script:BenchmarkDir)) {
+            New-Item -Path $script:BenchmarkDir -ItemType Directory -Force -ErrorAction Stop | Out-Null
+        }
+        ConvertTo-Json -InputObject ([pscustomobject]$results) -Depth 4 | Set-Content -LiteralPath $script:LastBenchFile -Encoding UTF8
+    } catch {
+        Write-Log ('Could not save benchmark results: {0}' -f $_.Exception.Message) 'WARN'
+    }
+
+    $txtBenchmark.Text = (Format-BenchmarkReport -Results ([pscustomobject]$results))
+    Write-Log ('Benchmark done. CPU single {0} iter/s, memory {1} MB/s' -f $results.CpuSingleIters, $results.MemMBps) 'OK'
+}
+
+function Format-BenchmarkReport {
+    param([Parameter(Mandatory = $true)]$Results)
+
+    $lines = @()
+    $lines += ('BALDYBEAST BENCHMARK  {0}' -f $Results.Timestamp)
+    $lines += ('CPU: {0}  ({1} threads, PowerShell {2})' -f $Results.CpuName, $Results.Threads, $Results.PsVersion)
+    $lines += '---------------------------------------------------------'
+    $lines += ('CPU single thread : {0} iter/s   ({1} ms for {2} rounds)' -f $Results.CpuSingleIters, $Results.CpuSingleMs, 2000000)
+    $lines += ('CPU multi thread  : {0} iter/s   ({1} threads)' -f $Results.CpuMultiIters, $Results.Threads)
+    $lines += ('Memory copy       : {0} MB/s' -f $Results.MemMBps)
+    $lines += ('Disk write (temp) : {0} MB/s' -f $Results.DiskWriteMBps)
+    $lines += ('Disk read  (temp) : {0} MB/s' -f $Results.DiskReadMBps)
+    $lines += ''
+    $lines += 'Scores compare on the same machine and PowerShell version only.'
+    $lines += 'Run before and after your tweaks, then press Compare to Baseline.'
+    return ($lines -join [System.Environment]::NewLine)
+}
+
+function Save-BenchmarkBaseline {
+    if (-not (Test-Path -LiteralPath $script:LastBenchFile)) {
+        Write-Log 'No benchmark results yet. Run the benchmark first.' 'WARN'
+        return
+    }
+    try {
+        Copy-Item -LiteralPath $script:LastBenchFile -Destination $script:BaselineBenchFile -Force
+        Write-Log 'Baseline saved. Run the benchmark again after your tweaks to compare.' 'OK'
+    } catch {
+        Write-Log ('Could not save baseline: {0}' -f $_.Exception.Message) 'ERROR'
+    }
+}
+
+function Compare-BenchmarkToBaseline {
+    if (-not (Test-Path -LiteralPath $script:BaselineBenchFile)) {
+        Write-Log 'No baseline saved yet. Run a benchmark and press Save as Baseline.' 'WARN'
+        return
+    }
+    if (-not (Test-Path -LiteralPath $script:LastBenchFile)) {
+        Write-Log 'No current results yet. Run the benchmark first.' 'WARN'
+        return
+    }
+
+    try {
+        $base = Get-Content -LiteralPath $script:BaselineBenchFile -Raw | ConvertFrom-Json
+        $last = Get-Content -LiteralPath $script:LastBenchFile -Raw | ConvertFrom-Json
+
+        $metrics = @(
+            @{ Label = 'CPU single thread'; Base = $base.CpuSingleIters; Last = $last.CpuSingleIters },
+            @{ Label = 'CPU multi thread';  Base = $base.CpuMultiIters;  Last = $last.CpuMultiIters },
+            @{ Label = 'Memory copy';       Base = $base.MemMBps;        Last = $last.MemMBps },
+            @{ Label = 'Disk write';        Base = $base.DiskWriteMBps;  Last = $last.DiskWriteMBps },
+            @{ Label = 'Disk read';         Base = $base.DiskReadMBps;   Last = $last.DiskReadMBps }
+        )
+
+        $lines = @()
+        $lines += ('COMPARISON  baseline {0}  vs  current {1}' -f $base.Timestamp, $last.Timestamp)
+        $lines += '---------------------------------------------------------'
+        foreach ($metric in $metrics) {
+            $delta = 0.0
+            if ([double]$metric.Base -gt 0) {
+                $delta = (([double]$metric.Last - [double]$metric.Base) / [double]$metric.Base) * 100
+            }
+            $sign = '+'
+            if ($delta -lt 0) { $sign = '' }
+            $lines += ('{0,-17} : {1}  ->  {2}   ({3}{4:N1}%)' -f $metric.Label, $metric.Base, $metric.Last, $sign, $delta)
+        }
+        $lines += ''
+        $lines += 'Positive is better. Small single digit swings are normal noise.'
+
+        $txtBenchmark.Text = (($txtBenchmark.Text) + [System.Environment]::NewLine + [System.Environment]::NewLine + ($lines -join [System.Environment]::NewLine))
+        Write-Log 'Benchmark comparison added to the results box' 'OK'
+    } catch {
+        Write-Log ('Comparison failed: {0}' -f $_.Exception.Message) 'ERROR'
+    }
+}
+
+# ----------------------------------------------------------------------------
+# Support bundle, desktop shortcut, classic context menu
+# ----------------------------------------------------------------------------
+function Export-SupportBundle {
+    Write-Log 'Building support bundle...'
+    try {
+        $staging = Join-Path $env:TEMP ('BaldyBeast-support-{0}' -f ([guid]::NewGuid().ToString('N').Substring(0, 6)))
+        New-Item -Path $staging -ItemType Directory -Force -ErrorAction Stop | Out-Null
+
+        $report = @()
+        $report += ('BALDYBEAST OPTIMIZER support bundle')
+        $report += ('Created  : {0}' -f (Get-Date).ToString('s'))
+        $report += ('Version  : {0}' -f $script:AppVersion)
+        $report += ('PowerShell: {0}' -f $PSVersionTable.PSVersion)
+        $report += ''
+        $report += 'HARDWARE'
+        $report += ($txtHardware.Text -split "`r?`n")
+        $report += ''
+        $report += 'TWEAK SELECTION'
+        foreach ($controlName in (Get-AllTweakNames)) {
+            $control = $script:Window.FindName($controlName)
+            $state = '[ ]'
+            if ($null -ne $control -and $control.IsChecked -eq $true) { $state = '[x]' }
+            $report += ('{0} {1}' -f $state, $controlName)
+        }
+        $report += ''
+        $report += 'LAST BENCHMARK'
+        if (Test-Path -LiteralPath $script:LastBenchFile) {
+            $report += (Get-Content -LiteralPath $script:LastBenchFile -Raw)
+        } else {
+            $report += '(none run)'
+        }
+        $report += ''
+        $report += 'LOG'
+        if (Test-Path -LiteralPath $script:LogFile) {
+            $report += (Get-Content -LiteralPath $script:LogFile -Tail 300)
+        }
+
+        Set-Content -LiteralPath (Join-Path $staging 'report.txt') -Value ($report -join [System.Environment]::NewLine) -Encoding UTF8
+        if (Test-Path -LiteralPath $script:LogFile) {
+            Copy-Item -LiteralPath $script:LogFile -Destination (Join-Path $staging 'BaldyBeast-Optimizer.log') -ErrorAction SilentlyContinue
+        }
+
+        $zipPath = Join-Path ([Environment]::GetFolderPath('Desktop')) ('BaldyBeast-support-{0}.zip' -f (Get-Date -Format 'yyyyMMdd-HHmmss'))
+        Compress-Archive -Path (Join-Path $staging '*') -DestinationPath $zipPath -Force
+        Remove-Item -LiteralPath $staging -Recurse -Force -ErrorAction SilentlyContinue
+
+        Write-Log ('Support bundle saved to your Desktop: {0}' -f [System.IO.Path]::GetFileName($zipPath)) 'OK'
+    } catch {
+        Write-Log ('Support bundle failed: {0}' -f $_.Exception.Message) 'ERROR'
+    }
+}
+
+function New-DesktopShortcut {
+    Write-Log 'Creating Desktop shortcut...'
+    try {
+        $desktop = [Environment]::GetFolderPath('Desktop')
+        $lnkPath = Join-Path $desktop 'BALDYBEAST OPTIMIZER.lnk'
+        $shell = New-Object -ComObject WScript.Shell
+        $shortcut = $shell.CreateShortcut($lnkPath)
+
+        if (-not [string]::IsNullOrWhiteSpace($PSCommandPath) -and (Test-Path -LiteralPath $PSCommandPath)) {
+            $shortcut.TargetPath = 'powershell.exe'
+            $shortcut.Arguments = ('-NoProfile -ExecutionPolicy Bypass -File "{0}"' -f $PSCommandPath)
+        } else {
+            $shortcut.TargetPath = 'powershell.exe'
+            $shortcut.Arguments = ('-NoProfile -WindowStyle Hidden -Command "irm ''{0}'' | iex"' -f $script:RepoRawUrl)
+        }
+
+        $shortcut.WorkingDirectory = $desktop
+        $shortcut.Description = 'BALDYBEAST OPTIMIZER - Windows gaming optimization utility'
+        $shortcut.Save()
+        Write-Log 'Desktop shortcut created: BALDYBEAST OPTIMIZER.lnk' 'OK'
+    } catch {
+        Write-Log ('Shortcut creation failed: {0}' -f $_.Exception.Message) 'ERROR'
+    }
+}
+
+function Enable-ClassicContextMenu {
+    Write-Log 'Enabling the classic Windows 11 right-click menu...'
+    Set-RegValue -Path 'HKCU:\Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32' -Name '(default)' -Value '' -Type 'String' | Out-Null
+    Write-Log 'Restart Explorer or sign out to see the classic menu. The Backups tab undoes this.' 'INFO'
+}
+
+# ----------------------------------------------------------------------------
+# Memory: RAMMap style breakdown and standby list purge
+# The purge uses NtSetSystemInformation(SystemMemoryListInformation) with the
+# SeProfileSingleProcessPrivilege, the same mechanism RAMMap and ISLC use.
+# No external tools involved.
+# ----------------------------------------------------------------------------
+if (-not ('BaldyBeast.Memory' -as [type])) {
+    Add-Type -Namespace BaldyBeast -Name Memory -MemberDefinition @'
+[System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+public struct TOKEN_PRIVILEGES
+{
+    public uint PrivilegeCount;
+    public uint LuidLow;
+    public int LuidHigh;
+    public uint Attributes;
+}
+
+[DllImport("ntdll.dll")]
+public static extern int NtSetSystemInformation(int infoClass, System.IntPtr info, int length);
+
+[DllImport("advapi32.dll", SetLastError = true)]
+public static extern bool OpenProcessToken(System.IntPtr processHandle, int access, out System.IntPtr tokenHandle);
+
+[DllImport("kernel32.dll")]
+public static extern System.IntPtr GetCurrentProcess();
+
+[DllImport("advapi32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+public static extern bool LookupPrivilegeValue(string systemName, string name, out long luid);
+
+[DllImport("advapi32.dll", SetLastError = true)]
+public static extern bool AdjustTokenPrivileges(System.IntPtr tokenHandle, bool disableAll, ref TOKEN_PRIVILEGES newState, int bufferLength, System.IntPtr previousState, System.IntPtr returnLength);
+
+public static string PurgeStandbyList()
+{
+    System.IntPtr token;
+    if (!OpenProcessToken(GetCurrentProcess(), 0x0020 | 0x0008, out token))
+    {
+        return "OpenProcessToken failed: " + System.Runtime.InteropServices.Marshal.GetLastWin32Error();
+    }
+
+    long luidValue;
+    if (!LookupPrivilegeValue(null, "SeProfileSingleProcessPrivilege", out luidValue))
+    {
+        return "LookupPrivilegeValue failed: " + System.Runtime.InteropServices.Marshal.GetLastWin32Error();
+    }
+
+    TOKEN_PRIVILEGES tp = new TOKEN_PRIVILEGES();
+    tp.PrivilegeCount = 1;
+    tp.LuidLow = (uint)(luidValue & 0xFFFFFFFF);
+    tp.LuidHigh = (int)(luidValue >> 32);
+    tp.Attributes = 0x00000002;
+
+    if (!AdjustTokenPrivileges(token, false, ref tp, 0, System.IntPtr.Zero, System.IntPtr.Zero))
+    {
+        return "AdjustTokenPrivileges failed: " + System.Runtime.InteropServices.Marshal.GetLastWin32Error();
+    }
+
+    System.IntPtr buffer = System.Runtime.InteropServices.Marshal.AllocHGlobal(4);
+    try
+    {
+        System.Runtime.InteropServices.Marshal.WriteInt32(buffer, 0, 12);
+        int status = NtSetSystemInformation(80, buffer, 4);
+        return status == 0 ? "ok" : ("NtSetSystemInformation status 0x" + status.ToString("X8"));
+    }
+    finally
+    {
+        System.Runtime.InteropServices.Marshal.FreeHGlobal(buffer);
+    }
+}
+'@
+}
+
+function Update-MemoryInfo {
+    try {
+        $os = Get-CimInstance -ClassName Win32_OperatingSystem -ErrorAction Stop
+        $lines = @()
+        $lines += ('Physical memory   : {0:N1} GB total / {1:N1} GB free' -f ($os.TotalVisibleMemorySize * 1KB / 1GB), ($os.FreePhysicalMemory * 1KB / 1GB))
+
+        $counterPaths = @(
+            '\Memory\Standby Cache Normal Priority Bytes',
+            '\Memory\Standby Cache Reserve Bytes',
+            '\Memory\Standby Cache Core Bytes',
+            '\Memory\Modified Page List Bytes',
+            '\Memory\Cache Bytes',
+            '\Memory\Free & Zero Page List Bytes'
+        )
+        try {
+            $samples = Get-Counter -Counter $counterPaths -ErrorAction Stop
+            foreach ($sample in $samples.CounterSamples) {
+                $label = $sample.Path -replace '^.*\\Memory\\', '' -replace ' Bytes$', ''
+                $lines += ('{0,-20}: {1,8:N0} MB' -f $label, ($sample.CookedValue / 1MB))
+            }
+        } catch {
+            $lines += '(memory counters unavailable on this system)'
+        }
+
+        $lines += ''
+        $lines += 'Top processes by working set:'
+        $top = Get-Process | Sort-Object WorkingSet64 -Descending | Select-Object -First 8
+        foreach ($proc in $top) {
+            $lines += ('  {0,-22} {1,7:N0} MB' -f $proc.ProcessName, ($proc.WorkingSet64 / 1MB))
+        }
+
+        $txtMemory.Text = ($lines -join [System.Environment]::NewLine)
+    } catch {
+        Write-Log ('Memory info failed: {0}' -f $_.Exception.Message) 'ERROR'
+    }
+}
+
+function Clear-StandbyList {
+    Write-Log 'Purging standby list (emptying cached file pages)...'
+    try {
+        $outcome = [BaldyBeast.Memory]::PurgeStandbyList()
+        if ($outcome -eq 'ok') {
+            Write-Log 'Standby list purged. Cached file pages were released.' 'OK'
+        } else {
+            Write-Log ('Standby purge: {0}' -f $outcome) 'ERROR'
+        }
+    } catch {
+        Write-Log ('Standby purge failed: {0}' -f $_.Exception.Message) 'ERROR'
+    }
+    Update-MemoryInfo
+}
+
+# ----------------------------------------------------------------------------
+# Recommended settings: taskbar layout (pure preference, never auto applied)
+# ----------------------------------------------------------------------------
+function Invoke-RecommendedTweaks {
+    Write-Log '===== Recommended Settings: applying selected tweaks ====='
+    $applied = $false
+
+    if ($chkTaskbarLeft.IsChecked) {
+        Set-RegValue -Path 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced' -Name 'TaskbarAl' -Value 0 | Out-Null
+        $applied = $true
+    }
+    if ($chkTaskbarSearch.IsChecked) {
+        Set-RegValue -Path 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Search' -Name 'SearchboxTaskbarMode' -Value 0 | Out-Null
+        $applied = $true
+    }
+    if ($chkTaskbarTaskView.IsChecked) {
+        Set-RegValue -Path 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced' -Name 'ShowTaskViewButton' -Value 0 | Out-Null
+        $applied = $true
+    }
+
+    if ($applied) {
+        Write-Log 'Taskbar settings applied. Restart Explorer or sign out to see them.' 'INFO'
+    } else {
+        Write-Log 'No taskbar settings were ticked, nothing changed'
+    }
+    Write-Log '===== Recommended Settings: done =====' 'OK'
+}
+
+# ----------------------------------------------------------------------------
 # Build the WPF window
 # ----------------------------------------------------------------------------
 Add-Type -AssemblyName PresentationFramework
@@ -1939,7 +2538,11 @@ $controlNames = @(
     'listBackups', 'btnRevertBackup', 'btnRefreshBackups', 'btnOpenBackupFolder',
     'btnCheckUpdate', 'btnDoUpdate', 'txtUpdateStatus',
     'listStartup', 'btnStartupDisable', 'btnStartupEnable', 'btnStartupRefresh', 'btnStartupFolder',
-    'cmbDnsProvider', 'btnDnsApply', 'btnDnsTest', 'chkWirelessPower', 'btnWirelessPower', 'txtNetwork'
+    'cmbDnsProvider', 'btnDnsApply', 'btnDnsTest', 'chkWirelessPower', 'btnWirelessPower', 'txtNetwork',
+    'txtBenchmark', 'btnBenchRun', 'btnBenchSave', 'btnBenchCompare', 'btnBenchOpen',
+    'btnExportBundle', 'btnMakeShortcut', 'chkClassicMenu',
+    'txtMemory', 'btnPurgeStandby', 'btnMemoryRefresh',
+    'chkTaskbarLeft', 'chkTaskbarSearch', 'chkTaskbarTaskView', 'btnApplyRecommended', 'btnOpenDisplay'
 )
 
 $missingNames = @()
@@ -1984,6 +2587,17 @@ Startup and Network:
   registry, never deleted). The Network tab switches DNS providers and tests
   latency so you can pick the fastest resolver for your line.
 
+Benchmark and Memory:
+  The Benchmark tab measures CPU, memory and disk so you can prove what a tweak
+  actually changed (run, save baseline, tweak, run, compare). The Hardware tab
+  has a RAMMap style memory breakdown and a Purge Standby List button that
+  releases cached file pages instantly.
+
+Support:
+  The About tab exports a support bundle (hardware, tweaks, benchmark, log) for
+  GitHub issues and creates a Desktop shortcut so you never need the one-liner
+  again.
+
 One line install from GitHub:
   irm "$($script:RepoRawUrl)" | iex
 
@@ -1993,7 +2607,7 @@ Safety notes:
   - Telemetry, background apps and Cortana are disabled by policy, not deleted.
   - The tool does not touch personal files, browsers, passwords or network settings.
 
-Author: BaldyBeast   |   License: MIT   |   Use at your own risk.
+Copyright (c) 2026 BaldyBeast. All rights reserved.   |   License: MIT   |   Use at your own risk.
 "@
 $txtAbout.Text = $aboutText
 
@@ -2018,7 +2632,7 @@ $btnSelectAllDebloat.Add_Click({
     $recommendedDebloat = @(
         'chkBloatBing', 'chkBloat3D', 'chkBloatGames', 'chkBloatCortana',
         'chkTelemetry', 'chkServices', 'chkCortana', 'chkBackgroundApps',
-        'chkConsumer', 'chkActivity', 'chkWidgets', 'chkCopilot', 'chkRecall'
+        'chkConsumer', 'chkActivity', 'chkWidgets', 'chkCopilot', 'chkRecall', 'chkClassicMenu'
     )
     foreach ($controlName in $recommendedDebloat) {
         $control = $window.FindName($controlName)
@@ -2082,7 +2696,7 @@ $btnPresetStreaming.Add_Click({
 })
 $btnPresetCleanInstall.Add_Click({
     Set-CheckboxSelection -Names (Get-AllTweakNames) -State $false
-    Set-CheckboxSelection -Names @('chkBloatBing', 'chkBloat3D', 'chkBloatGames', 'chkBloatCortana', 'chkTelemetry', 'chkServices', 'chkCortana', 'chkBackgroundApps', 'chkConsumer', 'chkActivity', 'chkWidgets', 'chkCopilot', 'chkRecall')
+    Set-CheckboxSelection -Names @('chkBloatBing', 'chkBloat3D', 'chkBloatGames', 'chkBloatCortana', 'chkTelemetry', 'chkServices', 'chkCortana', 'chkBackgroundApps', 'chkConsumer', 'chkActivity', 'chkWidgets', 'chkCopilot', 'chkRecall', 'chkClassicMenu')
     Write-Log 'Preset Clean Install Debloat ticked. Press Apply Selected Debloat Tweaks to run it' 'OK'
 })
 $btnPresetUncheckAll.Add_Click({
@@ -2165,6 +2779,40 @@ $btnDnsApply.Add_Click({
 $btnDnsTest.Add_Click({ Test-NetworkLatency })
 $btnWirelessPower.Add_Click({ Set-WirelessMaxPerformance })
 
+$btnBenchRun.Add_Click({ Start-Benchmark })
+$btnBenchSave.Add_Click({ Save-BenchmarkBaseline })
+$btnBenchCompare.Add_Click({ Compare-BenchmarkToBaseline })
+$btnBenchOpen.Add_Click({
+    if (-not (Test-Path -LiteralPath $script:BenchmarkDir)) {
+        New-Item -Path $script:BenchmarkDir -ItemType Directory -Force -ErrorAction SilentlyContinue | Out-Null
+    }
+    Start-Process -FilePath 'explorer.exe' -ArgumentList $script:BenchmarkDir
+})
+
+$btnExportBundle.Add_Click({
+    if (Confirm-Action 'Export Support Bundle' 'Create a zip on your Desktop with the hardware info, tweak selection, benchmark results and the log? This is what you attach to a GitHub issue.') {
+        Export-SupportBundle
+    }
+})
+$btnMakeShortcut.Add_Click({ New-DesktopShortcut })
+
+$btnPurgeStandby.Add_Click({
+    if (Confirm-Action 'Purge Standby List' 'Release all cached file pages from RAM now? Safe to do, Windows re-caches as needed. The next app launches may be slightly slower for a few minutes.') {
+        Clear-StandbyList
+    }
+})
+$btnMemoryRefresh.Add_Click({ Update-MemoryInfo })
+
+$btnApplyRecommended.Add_Click({ Invoke-RecommendedTweaks })
+$btnOpenDisplay.Add_Click({
+    try {
+        Start-Process 'ms-settings:display' | Out-Null
+        Write-Log 'Opened Windows Display settings. Check Advanced display and pick the highest refresh rate.' 'INFO'
+    } catch {
+        Write-Log ('Could not open display settings: {0}' -f $_.Exception.Message) 'ERROR'
+    }
+})
+
 # ----------------------------------------------------------------------------
 # Startup log
 # ----------------------------------------------------------------------------
@@ -2218,6 +2866,10 @@ $script:TweakInfo = @{
     'chkRecall'         = @('Recommended', 'Prevents Windows Recall from snapshotting your screen and disables AI data analysis.')
     'chkOneDrive'       = @('Advanced', 'Stops OneDrive from starting with Windows. Your files are untouched and you can re-enable it anytime.')
     'chkWirelessPower'  = @('Recommended', 'Stops Windows from lowering wireless adapter power, which keeps ping and packet loss steadier on WiFi. Uses a bit more battery on laptops.')
+    'chkClassicMenu'    = @('Recommended', 'Brings back the full Windows 10 style right-click menu on Windows 11. Restart Explorer or sign out to see it.')
+    'chkTaskbarLeft'    = @('Safe', 'Moves the taskbar icons back to the left like Windows 10. Pure looks, Windows 11 only.')
+    'chkTaskbarSearch'  = @('Safe', 'Removes the search box from the taskbar. You can still press the Windows key and type.')
+    'chkTaskbarTaskView' = @('Safe', 'Removes the Task View button from the taskbar. Win plus Tab still works.')
 }
 
 foreach ($infoEntry in $script:TweakInfo.GetEnumerator()) {
@@ -2232,6 +2884,7 @@ foreach ($infoEntry in $script:TweakInfo.GetEnumerator()) {
 # Startup initialization
 # ----------------------------------------------------------------------------
 Update-HardwareInfo
+Update-MemoryInfo
 Update-ProfileList
 Update-BackupList
 Update-StartupList
@@ -2317,6 +2970,44 @@ if ($script:ValidateMode) {
         Write-Host ('NETWORK TEST OK - {0} summary lines produced' -f $networkLines.Count) -ForegroundColor Green
     } catch {
         Write-Host ('NETWORK TEST FAILED: {0}' -f $_.Exception.Message) -ForegroundColor Red
+    }
+
+    # v1.3 smoke tests: tiny benchmark run, memory read, registry default value mapping
+    try {
+        $benchMs = Invoke-CpuSingleWork -Rounds 20000
+        $multiMs = Invoke-CpuMultiWork -Rounds 20000 -Threads 2
+        $memMBps = Invoke-MemoryWork -SizeMB 8
+        $disk = Invoke-DiskWork -Path $env:TEMP -SizeMB 4
+        if ($benchMs -gt 0 -and $multiMs -gt 0 -and $memMBps -gt 0 -and $disk.WriteMBps -gt 0 -and $disk.ReadMBps -gt 0) {
+            Write-Host ('BENCHMARK TEST OK - cpu {0} ms, memory {1} MB/s, disk write {2} MB/s' -f $benchMs, $memMBps, $disk.WriteMBps) -ForegroundColor Green
+        } else {
+            Write-Host 'BENCHMARK TEST FAILED - a phase returned zero' -ForegroundColor Red
+        }
+    } catch {
+        Write-Host ('BENCHMARK TEST FAILED: {0}' -f $_.Exception.Message) -ForegroundColor Red
+    }
+    try {
+        $memLines = @()
+        $osMem = Get-CimInstance -ClassName Win32_OperatingSystem -ErrorAction Stop
+        $memLines += ('{0:N1} GB total' -f ($osMem.TotalVisibleMemorySize * 1KB / 1GB))
+        Write-Host ('MEMORY TEST OK - {0}' -f ($memLines -join '; ')) -ForegroundColor Green
+    } catch {
+        Write-Host ('MEMORY TEST FAILED: {0}' -f $_.Exception.Message) -ForegroundColor Red
+    }
+    try {
+        $defaultKey = 'HKCU:\Software\BaldyBeastValidateTestDefault\InprocServer32'
+        New-Item -Path $defaultKey -Force -ErrorAction Stop | Out-Null
+        New-ItemProperty -Path $defaultKey -Name '(default)' -Value '' -PropertyType String -Force -ErrorAction Stop | Out-Null
+        $defaultNames = @((Get-Item -LiteralPath $defaultKey).GetValueNames())
+        if ($defaultNames -contains '') {
+            Write-Host 'DEFAULT VALUE TEST OK - (default) maps to the real registry default value' -ForegroundColor Green
+        } else {
+            Write-Host ('DEFAULT VALUE TEST FAILED - names present: [{0}]' -f ($defaultNames -join ',')) -ForegroundColor Red
+        }
+        Remove-Item -Path 'HKCU:\Software\BaldyBeastValidateTestDefault' -Recurse -Force -ErrorAction SilentlyContinue
+    } catch {
+        Write-Host ('DEFAULT VALUE TEST FAILED: {0}' -f $_.Exception.Message) -ForegroundColor Red
+        Remove-Item -Path 'HKCU:\Software\BaldyBeastValidateTestDefault' -Recurse -Force -ErrorAction SilentlyContinue
     }
 
     if ($missingNames.Count -gt 0) {
