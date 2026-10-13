@@ -12,13 +12,17 @@
 
 $ErrorActionPreference = 'Continue'
 
-$script:AppVersion   = '1.0.0'
+$script:AppVersion   = '1.1.0'
 $script:RepoRawUrl   = 'https://raw.githubusercontent.com/BaldyBeast/BALDYBEAST-OPTIMIZER/main/Optimize.ps1'
 $script:LogFile      = Join-Path $env:TEMP 'BaldyBeast-Optimizer.log'
 $script:LogBox       = $null
 $script:Window       = $null
 $script:NeedsReboot  = $false
 $script:ValidateMode = ($env:BALDYBEAST_VALIDATE -eq '1')
+$script:BackupRoot   = Join-Path $env:LOCALAPPDATA 'BaldyBeast\backups'
+$script:ProfileRoot  = Join-Path $env:LOCALAPPDATA 'BaldyBeast\profiles'
+$script:BackupFile   = $null
+$script:LatestVersion = $null
 
 # ----------------------------------------------------------------------------
 # ASCII banner font (every cell is exactly 7 characters wide)
@@ -157,6 +161,7 @@ function Set-RegValue {
     )
 
     try {
+        Backup-RegValue -Path $Path -Name $Name
         if (-not (Test-Path -LiteralPath $Path)) {
             New-Item -Path $Path -Force -ErrorAction Stop | Out-Null
         }
@@ -184,6 +189,7 @@ function Set-ServiceSafe {
         if ($service.Status -eq 'Running') {
             Stop-Service -Name $Name -Force -ErrorAction SilentlyContinue
         }
+        Backup-Service -Name $Name
         Set-Service -Name $Name -StartupType $StartType -ErrorAction Stop
         Write-Log ('Service {0} set to {1}' -f $Name, $StartType) 'OK'
     } catch {
@@ -208,6 +214,7 @@ function Disable-TaskSafe {
             Write-Log ('Task not present, skipped: {0}' -f $TaskPath)
             return
         }
+        Backup-Task -TaskName $name -TaskPath $folder
         Disable-ScheduledTask -TaskName $name -TaskPath $folder -ErrorAction Stop | Out-Null
         Write-Log ('Task disabled: {0}' -f $TaskPath) 'OK'
     } catch {
@@ -286,6 +293,14 @@ $xamlA = @'
       <Setter Property="FontSize" Value="13"/>
       <Setter Property="Margin" Value="2,6,2,6"/>
       <Setter Property="VerticalContentAlignment" Value="Center"/>
+      <Style.Triggers>
+        <DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource Self}}" Value="Safe">
+          <Setter Property="Foreground" Value="#FF7CE38B"/>
+        </DataTrigger>
+        <DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource Self}}" Value="Advanced">
+          <Setter Property="Foreground" Value="#FFF5A97F"/>
+        </DataTrigger>
+      </Style.Triggers>
     </Style>
 
     <Style TargetType="Button" x:Key="DarkButton">
@@ -381,6 +396,13 @@ $xamlA = @'
                    Foreground="#FFF59E0B" TextWrapping="NoWrap"/>
         <TextBlock x:Name="txtSubtitle" Foreground="#FFA0A0B8" FontSize="12" Margin="2,4,0,0"
                    Text="Windows 10 / 11 gaming optimizer, debloat and cleanup utility"/>
+        <StackPanel Orientation="Horizontal" Margin="2,6,0,0">
+          <TextBlock Text="RISK" Foreground="#FF6B6B88" FontSize="11" Margin="0,0,8,0"/>
+          <TextBlock Text="Safe" Foreground="#FF7CE38B" FontSize="11" Margin="0,0,12,0"/>
+          <TextBlock Text="Recommended" Foreground="#FFE8E8F0" FontSize="11" Margin="0,0,12,0"/>
+          <TextBlock Text="Advanced" Foreground="#FFF5A97F" FontSize="11" Margin="0,0,12,0"/>
+          <TextBlock Text="hover any option for what it does" Foreground="#FF6B6B88" FontSize="11"/>
+        </StackPanel>
       </StackPanel>
       <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
         <Button x:Name="btnRestorePoint" Style="{StaticResource DarkButton}" Content="Create Restore Point" Margin="0,0,8,0"/>
@@ -546,6 +568,88 @@ $xamlB = @'
         </ScrollViewer>
       </TabItem>
 
+      <!-- ================= HARDWARE ================= -->
+      <TabItem Header="Hardware" Style="{StaticResource DarkTab}">
+        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="4">
+          <StackPanel>
+            <Border Style="{StaticResource Card}">
+              <StackPanel>
+                <TextBlock Style="{StaticResource CardHeader}" Text="System Information"/>
+                <TextBox x:Name="txtHardware" IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap"
+                         FontFamily="Consolas" FontSize="12.5" Background="#FF0D0D14" Foreground="#FFB8D8F0"
+                         BorderBrush="#FF3A3A52" Padding="10" MinHeight="270"
+                         VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"/>
+                <Button x:Name="btnRefreshHw" Style="{StaticResource DarkButton}" Content="Refresh"
+                        HorizontalAlignment="Left" Margin="0,10,0,0"/>
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- ================= PROFILES ================= -->
+      <TabItem Header="Profiles" Style="{StaticResource DarkTab}">
+        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="4">
+          <StackPanel>
+            <Border Style="{StaticResource Card}">
+              <StackPanel>
+                <TextBlock Style="{StaticResource CardHeader}" Text="Built-in Presets"/>
+                <TextBlock Style="{StaticResource DimText}"
+                           Text="Presets only tick the checkboxes so you can review them. Press an Apply button afterwards to actually run them."/>
+                <WrapPanel>
+                  <Button x:Name="btnPresetCompetitive" Style="{StaticResource DarkButton}" Content="Competitive FPS" Margin="0,0,8,8"/>
+                  <Button x:Name="btnPresetStreaming" Style="{StaticResource DarkButton}" Content="Streaming" Margin="0,0,8,8"/>
+                  <Button x:Name="btnPresetCleanInstall" Style="{StaticResource DarkButton}" Content="Clean Install Debloat" Margin="0,0,8,8"/>
+                  <Button x:Name="btnPresetUncheckAll" Style="{StaticResource DarkButton}" Content="Uncheck Everything" Margin="0,0,8,8"/>
+                </WrapPanel>
+              </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource Card}">
+              <StackPanel>
+                <TextBlock Style="{StaticResource CardHeader}" Text="Your Profiles"/>
+                <TextBlock Style="{StaticResource DimText}"
+                           Text="Profiles store which boxes are ticked. They live in %LOCALAPPDATA%\BaldyBeast\profiles as JSON you can share."/>
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                  <TextBox x:Name="txtProfileName" Width="250" Padding="7" FontSize="13"
+                           Background="#FF0D0D14" Foreground="#FFE8E8F0" BorderBrush="#FF3A3A52"
+                           ToolTip="Profile name"/>
+                  <Button x:Name="btnSaveProfile" Style="{StaticResource DarkButton}" Content="Save Current Selection" Margin="8,0,0,0"/>
+                </StackPanel>
+                <ListBox x:Name="listProfiles" Height="150" Background="#FF0D0D14" Foreground="#FFE8E8F0"
+                         BorderBrush="#FF3A3A52" FontFamily="Consolas" FontSize="12"/>
+                <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                  <Button x:Name="btnLoadProfile" Style="{StaticResource AccentButton}" Content="Load Selected" Margin="0,0,8,0"/>
+                  <Button x:Name="btnDeleteProfile" Style="{StaticResource DangerButton}" Content="Delete Selected"/>
+                </StackPanel>
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- ================= BACKUPS ================= -->
+      <TabItem Header="Backups" Style="{StaticResource DarkTab}">
+        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="4">
+          <StackPanel>
+            <Border Style="{StaticResource Card}">
+              <StackPanel>
+                <TextBlock Style="{StaticResource CardHeader}" Text="Rollback Points"/>
+                <TextBlock Style="{StaticResource DimText}"
+                           Text="Every registry, service and scheduled task change is recorded automatically before it is applied. Reverting restores the exact previous state. App removals and power plan switches are not covered here, use System Restore or reinstall the app for those."/>
+                <ListBox x:Name="listBackups" Height="220" Background="#FF0D0D14" Foreground="#FFE8E8F0"
+                         BorderBrush="#FF3A3A52" FontFamily="Consolas" FontSize="12"/>
+                <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                  <Button x:Name="btnRevertBackup" Style="{StaticResource DangerButton}" Content="Revert Selected Backup" Margin="0,0,8,0"/>
+                  <Button x:Name="btnRefreshBackups" Style="{StaticResource DarkButton}" Content="Refresh List" Margin="0,0,8,0"/>
+                  <Button x:Name="btnOpenBackupFolder" Style="{StaticResource DarkButton}" Content="Open Backup Folder"/>
+                </StackPanel>
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
       <!-- ================= ABOUT ================= -->
       <TabItem Header="About" Style="{StaticResource DarkTab}">
         <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="4">
@@ -554,6 +658,11 @@ $xamlB = @'
               <StackPanel>
                 <TextBlock Style="{StaticResource CardHeader}" Text="BALDYBEAST OPTIMIZER"/>
                 <TextBlock x:Name="txtAbout" TextWrapping="Wrap" Foreground="#FFD0D0E0" FontSize="13" LineHeight="23"/>
+                <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+                  <Button x:Name="btnCheckUpdate" Style="{StaticResource DarkButton}" Content="Check for Updates" Margin="0,0,8,0"/>
+                  <Button x:Name="btnDoUpdate" Style="{StaticResource AccentButton}" Content="Download and Restart" IsEnabled="False"/>
+                </StackPanel>
+                <TextBlock x:Name="txtUpdateStatus" Style="{StaticResource DimText}" Text="Update status: not checked yet"/>
               </StackPanel>
             </Border>
           </StackPanel>
@@ -1110,6 +1219,402 @@ function Start-OptimizeAll {
 }
 
 # ----------------------------------------------------------------------------
+# Rollback backups: every registry, service and task change is recorded before
+# it is applied so it can be reverted from the Backups tab
+# ----------------------------------------------------------------------------
+function Get-BackupStore {
+    if ($null -eq $script:BackupFile) {
+        if (-not (Test-Path -LiteralPath $script:BackupRoot)) {
+            New-Item -Path $script:BackupRoot -ItemType Directory -Force -ErrorAction SilentlyContinue | Out-Null
+        }
+        $script:BackupFile = Join-Path $script:BackupRoot ('backup-{0}.jsonl' -f (Get-Date -Format 'yyyyMMdd-HHmmss'))
+        New-Item -Path $script:BackupFile -ItemType File -Force -ErrorAction Stop | Out-Null
+        Write-Log ('Rollback point file: {0}' -f $script:BackupFile)
+    }
+    return $script:BackupFile
+}
+
+function Add-BackupRecord {
+    param([Parameter(Mandatory = $true)][hashtable]$Record)
+    try {
+        $file = Get-BackupStore
+        $Record['Timestamp'] = (Get-Date).ToString('s')
+        $line = [pscustomobject]$Record | ConvertTo-Json -Compress -Depth 4
+        Add-Content -LiteralPath $file -Value $line -Encoding UTF8
+    } catch {
+        Write-Log ('Backup record failed: {0}' -f $_.Exception.Message) 'WARN'
+    }
+}
+
+function Read-BackupRecords {
+    param([Parameter(Mandatory = $true)][string]$File)
+    # One JSON object per line keeps every record flat. Windows PowerShell 5.1
+    # wraps whole JSON arrays when they are parsed, which broke array storage.
+    $records = @()
+    foreach ($line in (Get-Content -LiteralPath $File -ErrorAction Stop)) {
+        if (-not [string]::IsNullOrWhiteSpace($line)) {
+            $records += ($line | ConvertFrom-Json)
+        }
+    }
+    return $records
+}
+
+function Backup-RegValue {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][string]$Name
+    )
+    try {
+        $keyExisted   = Test-Path -LiteralPath $Path
+        $valueExisted = $false
+        $oldValue     = $null
+        $oldType      = 'String'
+
+        if ($keyExisted) {
+            $key = Get-Item -LiteralPath $Path -ErrorAction SilentlyContinue
+            if ($null -ne $key -and ($key.GetValueNames() -contains $Name)) {
+                $valueExisted = $true
+                $oldValue     = $key.GetValue($Name, $null, 'DoNotExpandEnvironmentNames')
+                $oldType      = $key.GetValueKind($Name).ToString()
+            }
+        }
+
+        Add-BackupRecord -Record @{
+            Kind        = 'Registry'
+            Path        = $Path
+            Name        = $Name
+            KeyExisted  = [bool]$keyExisted
+            ValueExisted = [bool]$valueExisted
+            OldValue    = $oldValue
+            OldType     = $oldType
+        }
+    } catch {
+        Write-Log ('Backup capture failed for {0}\{1}' -f $Path, $Name) 'WARN'
+    }
+}
+
+function Backup-Service {
+    param([Parameter(Mandatory = $true)][string]$Name)
+    try {
+        $svc = Get-Service -Name $Name -ErrorAction SilentlyContinue
+        if ($null -eq $svc) { return }
+        Add-BackupRecord -Record @{
+            Kind         = 'Service'
+            Name         = $Name
+            OldStartType = $svc.StartType.ToString()
+            OldStatus    = $svc.Status.ToString()
+        }
+    } catch { }
+}
+
+function Backup-Task {
+    param(
+        [Parameter(Mandatory = $true)][string]$TaskName,
+        [Parameter(Mandatory = $true)][string]$TaskPath
+    )
+    try {
+        $task = Get-ScheduledTask -TaskName $TaskName -TaskPath $TaskPath -ErrorAction SilentlyContinue
+        if ($null -eq $task) { return }
+        Add-BackupRecord -Record @{
+            Kind      = 'Task'
+            Name      = $TaskName
+            Path      = $TaskPath
+            OldState  = $task.State.ToString()
+        }
+    } catch { }
+}
+
+function Restore-BackupFile {
+    param([Parameter(Mandatory = $true)][string]$File)
+
+    try {
+        $records = @(Read-BackupRecords -File $File)
+    } catch {
+        Write-Log ('Could not read backup file: {0}' -f $_.Exception.Message) 'ERROR'
+        return $false
+    }
+
+    $allOk = $true
+    for ($i = $records.Count - 1; $i -ge 0; $i--) {
+        $rec = $records[$i]
+        try {
+            switch ($rec.Kind) {
+                'Registry' {
+                    if (-not $rec.KeyExisted) {
+                        Remove-Item -LiteralPath $rec.Path -Recurse -Force -ErrorAction SilentlyContinue
+                        Write-Log ('Reverted: removed key we created {0}' -f $rec.Path) 'OK'
+                    } elseif (-not $rec.ValueExisted) {
+                        Remove-ItemProperty -LiteralPath $rec.Path -Name $rec.Name -Force -ErrorAction SilentlyContinue
+                        Write-Log ('Reverted: removed {0}\{1}' -f $rec.Path, $rec.Name) 'OK'
+                    } else {
+                        if (-not (Test-Path -LiteralPath $rec.Path)) {
+                            New-Item -Path $rec.Path -Force -ErrorAction Stop | Out-Null
+                        }
+                        $restoreValue = $rec.OldValue
+                        if ($rec.OldType -eq 'Binary') { $restoreValue = [byte[]]$rec.OldValue }
+                        New-ItemProperty -LiteralPath $rec.Path -Name $rec.Name -Value $restoreValue -PropertyType $rec.OldType -Force -ErrorAction Stop | Out-Null
+                        Write-Log ('Reverted: {0}\{1} restored' -f $rec.Path, $rec.Name) 'OK'
+                    }
+                }
+                'Service' {
+                    Set-Service -Name $rec.Name -StartupType $rec.OldStartType -ErrorAction Stop
+                    if ($rec.OldStatus -eq 'Running') {
+                        Start-Service -Name $rec.Name -ErrorAction SilentlyContinue
+                    }
+                    Write-Log ('Reverted: service {0} restored' -f $rec.Name) 'OK'
+                }
+                'Task' {
+                    if ($rec.OldState -eq 'Enabled') {
+                        Enable-ScheduledTask -TaskName $rec.Name -TaskPath $rec.Path -ErrorAction Stop | Out-Null
+                    } else {
+                        Disable-ScheduledTask -TaskName $rec.Name -TaskPath $rec.Path -ErrorAction Stop | Out-Null
+                    }
+                    Write-Log ('Reverted: task {0} restored' -f $rec.Name) 'OK'
+                }
+            }
+        } catch {
+            Write-Log ('Revert step failed ({0}): {1}' -f $rec.Kind, $_.Exception.Message) 'ERROR'
+            $allOk = $false
+        }
+    }
+    return $allOk
+}
+
+function Update-BackupList {
+    if ($null -eq $listBackups) { return }
+    $listBackups.Items.Clear()
+    if (-not (Test-Path -LiteralPath $script:BackupRoot)) { return }
+
+    $files = Get-ChildItem -LiteralPath $script:BackupRoot -Filter 'backup-*.jsonl' -ErrorAction SilentlyContinue |
+        Sort-Object Name -Descending
+
+    foreach ($file in $files) {
+        $count = 0
+        try {
+            $count = @(Read-BackupRecords -File $file.FullName).Count
+        } catch { }
+        $item = New-Object System.Windows.Controls.ListBoxItem
+        $item.Content = ('{0}   ({1} recorded changes)' -f $file.BaseName, $count)
+        $item.Tag = $file.FullName
+        [void]$listBackups.Items.Add($item)
+    }
+}
+
+# ----------------------------------------------------------------------------
+# Profiles: save and load checkbox selections as JSON
+# ----------------------------------------------------------------------------
+function Get-AllTweakNames {
+    return @(
+        'chkPowerPlan', 'chkMouseAccel', 'chkGameDVR', 'chkFullscreen', 'chkGameMode',
+        'chkHAGS', 'chkMmcss', 'chkUsbSuspend', 'chkVisualFx',
+        'chkBloatBing', 'chkBloat3D', 'chkBloatGames', 'chkBloatMisc', 'chkBloatCortana',
+        'chkTelemetry', 'chkServices', 'chkCortana', 'chkBackgroundApps',
+        'chkConsumer', 'chkActivity', 'chkWidgets', 'chkCopilot', 'chkRecall', 'chkOneDrive'
+    )
+}
+
+function Set-CheckboxSelection {
+    param(
+        [Parameter(Mandatory = $true)][string[]]$Names,
+        [bool]$State = $true
+    )
+    foreach ($controlName in $Names) {
+        $control = $script:Window.FindName($controlName)
+        if ($null -ne $control) { $control.IsChecked = $State }
+    }
+}
+
+function Save-CurrentProfile {
+    param([Parameter(Mandatory = $true)][string]$Name)
+
+    $cleanName = ($Name -replace '[^A-Za-z0-9 _-]', '').Trim()
+    if ([string]::IsNullOrWhiteSpace($cleanName)) {
+        Write-Log 'Enter a profile name first' 'WARN'
+        return
+    }
+
+    try {
+        if (-not (Test-Path -LiteralPath $script:ProfileRoot)) {
+            New-Item -Path $script:ProfileRoot -ItemType Directory -Force -ErrorAction Stop | Out-Null
+        }
+
+        $checked = @()
+        foreach ($controlName in (Get-AllTweakNames)) {
+            $control = $script:Window.FindName($controlName)
+            if ($null -ne $control -and $control.IsChecked -eq $true) { $checked += $controlName }
+        }
+
+        $profile = [pscustomobject]@{
+            Name       = $cleanName
+            Version    = $script:AppVersion
+            CreatedUtc = (Get-Date).ToUniversalTime().ToString('s')
+            Checked    = $checked
+        }
+
+        $file = Join-Path $script:ProfileRoot ($cleanName + '.json')
+        ConvertTo-Json -InputObject $profile -Depth 4 | Set-Content -LiteralPath $file -Encoding UTF8
+        Write-Log ('Profile saved: {0} ({1} tweaks selected)' -f $cleanName, $checked.Count) 'OK'
+        Update-ProfileList
+    } catch {
+        Write-Log ('Profile save failed: {0}' -f $_.Exception.Message) 'ERROR'
+    }
+}
+
+function Load-Profile {
+    param([Parameter(Mandatory = $true)][string]$Name)
+
+    $file = Join-Path $script:ProfileRoot ($Name + '.json')
+    if (-not (Test-Path -LiteralPath $file)) {
+        Write-Log ('Profile not found: {0}' -f $Name) 'WARN'
+        return
+    }
+
+    try {
+        $profile = Get-Content -LiteralPath $file -Raw | ConvertFrom-Json
+        Set-CheckboxSelection -Names (Get-AllTweakNames) -State $false
+        Set-CheckboxSelection -Names @($profile.Checked) -State $true
+        Write-Log ('Profile loaded: {0} ({1} tweaks ticked)' -f $Name, @($profile.Checked).Count) 'OK'
+        Write-Log 'Press an Apply button to actually run the ticked tweaks' 'INFO'
+    } catch {
+        Write-Log ('Profile load failed: {0}' -f $_.Exception.Message) 'ERROR'
+    }
+}
+
+function Remove-Profile {
+    param([Parameter(Mandatory = $true)][string]$Name)
+    try {
+        $file = Join-Path $script:ProfileRoot ($Name + '.json')
+        if (Test-Path -LiteralPath $file) {
+            Remove-Item -LiteralPath $file -Force -ErrorAction Stop
+            Write-Log ('Profile deleted: {0}' -f $Name) 'OK'
+        }
+        Update-ProfileList
+    } catch {
+        Write-Log ('Profile delete failed: {0}' -f $_.Exception.Message) 'ERROR'
+    }
+}
+
+function Update-ProfileList {
+    if ($null -eq $listProfiles) { return }
+    $listProfiles.Items.Clear()
+    if (-not (Test-Path -LiteralPath $script:ProfileRoot)) { return }
+
+    $files = Get-ChildItem -LiteralPath $script:ProfileRoot -Filter '*.json' -ErrorAction SilentlyContinue |
+        Sort-Object Name
+
+    foreach ($file in $files) {
+        $item = New-Object System.Windows.Controls.ListBoxItem
+        $item.Content = $file.BaseName
+        $item.Tag = $file.BaseName
+        [void]$listProfiles.Items.Add($item)
+    }
+}
+
+# ----------------------------------------------------------------------------
+# Hardware dashboard
+# ----------------------------------------------------------------------------
+function Update-HardwareInfo {
+    try {
+        $os   = Get-CimInstance -ClassName Win32_OperatingSystem -ErrorAction Stop
+        $cpu  = Get-CimInstance -ClassName Win32_Processor -ErrorAction Stop | Select-Object -First 1
+        $gpu  = Get-CimInstance -ClassName Win32_VideoController -ErrorAction Stop | Select-Object -First 1
+        $cs   = Get-CimInstance -ClassName Win32_ComputerSystem -ErrorAction Stop
+        $disks = Get-CimInstance -ClassName Win32_LogicalDisk -Filter 'DriveType=3' -ErrorAction SilentlyContinue
+
+        $uptime = (Get-Date) - $os.LastBootUpTime
+        $lines = @()
+        $lines += ('OS            : {0} (build {1})' -f $os.Caption, $os.BuildNumber)
+        $lines += ('CPU           : {0}' -f $cpu.Name.Trim())
+        $lines += ('Cores/Threads : {0} cores / {1} threads' -f $cpu.NumberOfCores, $cpu.NumberOfLogicalProcessors)
+        $lines += ('GPU           : {0}' -f $gpu.Name)
+        $lines += ('GPU driver    : {0}' -f $gpu.DriverVersion)
+        $lines += ('Memory        : {0:N1} GB total / {1:N1} GB in use' -f ($cs.TotalPhysicalMemory / 1GB), (($os.TotalVisibleMemorySize - $os.FreePhysicalMemory) * 1KB / 1GB))
+
+        foreach ($disk in $disks) {
+            $lines += ('Disk {0,-9} : {1:N0} GB total / {2:N0} GB free' -f ($disk.DeviceID + ':'), ($disk.Size / 1GB), ($disk.FreeSpace / 1GB))
+        }
+
+        try {
+            $pageFiles = @(Get-CimInstance -ClassName Win32_PageFileUsage -ErrorAction Stop)
+            if ($pageFiles.Count -gt 0) {
+                $lines += ('Page file     : {0} ({1} MB allocated)' -f $pageFiles[0].Name, $pageFiles[0].AllocatedBaseSize)
+            } else {
+                $lines += 'Page file     : system managed or not present'
+            }
+        } catch {
+            $lines += 'Page file     : unknown'
+        }
+
+        $lines += ('Uptime        : {0}h {1}m' -f [int][math]::Floor($uptime.TotalHours), $uptime.Minutes)
+        $lines += ('Computer name : {0}' -f $cs.Name)
+
+        try {
+            $plan = & powercfg.exe /getactivescheme 2>$null
+            if ($plan -match '\((.+)\)') {
+                $lines += ('Power plan    : {0}' -f $Matches[1])
+            } elseif ($null -ne $plan) {
+                $lines += ('Power plan    : {0}' -f ([string]$plan).Trim())
+            }
+        } catch {
+            $lines += 'Power plan    : unknown'
+        }
+
+        $txtHardware.Text = ($lines -join [System.Environment]::NewLine)
+        Write-Log 'Hardware info refreshed' 'OK'
+    } catch {
+        Write-Log ('Hardware info failed: {0}' -f $_.Exception.Message) 'ERROR'
+    }
+}
+
+# ----------------------------------------------------------------------------
+# Self update
+# ----------------------------------------------------------------------------
+function Test-ForUpdate {
+    try {
+        $raw = Invoke-RestMethod -Uri $script:RepoRawUrl -TimeoutSec 8 -ErrorAction Stop
+        $match = [regex]::Match([string]$raw, "AppVersion\s*=\s*'([0-9\.]+)'")
+
+        if (-not $match.Success) {
+            $txtUpdateStatus.Text = 'Update status: version marker not found in the GitHub file'
+            return
+        }
+
+        $script:LatestVersion = [version]$match.Groups[1].Value
+        $running = [version]$script:AppVersion
+
+        if ($script:LatestVersion -gt $running) {
+            $txtUpdateStatus.Text = ('Update status: v{0} is available (you run v{1})' -f $script:LatestVersion, $running)
+            $btnDoUpdate.IsEnabled = $true
+            Write-Log ('Update available: v{0}' -f $script:LatestVersion) 'WARN'
+        } else {
+            $txtUpdateStatus.Text = ('Update status: you are on the latest version (v{0})' -f $running)
+            Write-Log 'Running the latest version' 'OK'
+        }
+    } catch {
+        $txtUpdateStatus.Text = 'Update status: could not reach GitHub (offline?)'
+        Write-Log 'Update check skipped, no connection to GitHub' 'WARN'
+    }
+}
+
+function Install-Update {
+    try {
+        $raw = Invoke-RestMethod -Uri $script:RepoRawUrl -TimeoutSec 20 -ErrorAction Stop
+        if ([string]$raw -notmatch 'BALDYBEAST OPTIMIZER') {
+            throw 'downloaded file failed the content check'
+        }
+
+        $temp = Join-Path $env:TEMP 'BaldyBeast-Optimize-update.ps1'
+        Set-Content -LiteralPath $temp -Value $raw -Encoding UTF8
+        Write-Log 'Update downloaded, restarting with the new version...' 'OK'
+
+        Start-Process -FilePath 'powershell.exe' -ArgumentList ('-NoProfile -ExecutionPolicy Bypass -File "{0}"' -f $temp) | Out-Null
+        $window.Close()
+    } catch {
+        Write-Log ('Update failed: {0}' -f $_.Exception.Message) 'ERROR'
+    }
+}
+
+# ----------------------------------------------------------------------------
 # Build the WPF window
 # ----------------------------------------------------------------------------
 Add-Type -AssemblyName PresentationFramework
@@ -1145,7 +1650,12 @@ $controlNames = @(
     'chkTelemetry', 'chkServices', 'chkCortana', 'chkBackgroundApps',
     'chkConsumer', 'chkActivity', 'chkWidgets', 'chkCopilot', 'chkRecall', 'chkOneDrive',
     'btnCleanTemp', 'btnCleanWU', 'btnCleanPrefetch', 'btnCleanDO',
-    'btnCleanWER', 'btnCleanRecycle', 'btnCleanDNS', 'btnCleanAll', 'btnDisableHibernation'
+    'btnCleanWER', 'btnCleanRecycle', 'btnCleanDNS', 'btnCleanAll', 'btnDisableHibernation',
+    'txtHardware', 'btnRefreshHw',
+    'txtProfileName', 'listProfiles', 'btnSaveProfile', 'btnLoadProfile', 'btnDeleteProfile',
+    'btnPresetCompetitive', 'btnPresetStreaming', 'btnPresetCleanInstall', 'btnPresetUncheckAll',
+    'listBackups', 'btnRevertBackup', 'btnRefreshBackups', 'btnOpenBackupFolder',
+    'btnCheckUpdate', 'btnDoUpdate', 'txtUpdateStatus'
 )
 
 $missingNames = @()
@@ -1171,9 +1681,19 @@ Single file Windows 10 / 11 gaming optimization, debloat and cleanup utility.
 Pure PowerShell + WPF. No external DLLs, no installers, no background services.
 
 Quick start:
-  1. Click "Create Restore Point" so you can always roll back.
-  2. Tick the tweaks you want, or hit "Optimize Everything (Gaming Ready)".
+  1. Click "Create Restore Point" so you can always roll back everything.
+  2. Tick the tweaks you want (hover any option to see what it does), or hit
+     "Optimize Everything (Gaming Ready)".
   3. Watch the Console Log. Restart when the tool asks for one.
+
+Rollback:
+  Every registry, service and task change is recorded automatically before it
+  is applied. Open the Backups tab to restore the exact previous state of any
+  session. App removals and power plan switches are not covered there.
+
+Profiles:
+  Save your checkbox selection as a JSON profile in
+  %LOCALAPPDATA%\BaldyBeast\profiles and share the file with friends.
 
 One line install from GitHub:
   irm "$($script:RepoRawUrl)" | iex
@@ -1240,6 +1760,77 @@ $btnDisableHibernation.Add_Click({
 
 $btnClearLog.Add_Click({ $txtLog.Clear() })
 
+$btnRefreshHw.Add_Click({ Update-HardwareInfo })
+
+$btnSaveProfile.Add_Click({ Save-CurrentProfile -Name $txtProfileName.Text })
+$btnLoadProfile.Add_Click({
+    if ($null -eq $listProfiles.SelectedItem) {
+        Write-Log 'Select a profile in the list first' 'WARN'
+        return
+    }
+    Load-Profile -Name ([string]$listProfiles.SelectedItem.Tag)
+})
+$btnDeleteProfile.Add_Click({
+    if ($null -eq $listProfiles.SelectedItem) {
+        Write-Log 'Select a profile in the list first' 'WARN'
+        return
+    }
+    $profileName = [string]$listProfiles.SelectedItem.Tag
+    if (Confirm-Action 'Delete profile' ('Delete the profile "{0}"?' -f $profileName)) {
+        Remove-Profile -Name $profileName
+    }
+})
+
+$btnPresetCompetitive.Add_Click({
+    Set-CheckboxSelection -Names (Get-AllTweakNames) -State $false
+    Set-CheckboxSelection -Names @('chkPowerPlan', 'chkMouseAccel', 'chkGameDVR', 'chkFullscreen', 'chkGameMode', 'chkHAGS', 'chkMmcss', 'chkUsbSuspend', 'chkVisualFx', 'chkTelemetry', 'chkBackgroundApps')
+    Write-Log 'Preset Competitive FPS ticked. Review the Gaming tab, then press Apply Selected Gaming Tweaks' 'OK'
+})
+$btnPresetStreaming.Add_Click({
+    Set-CheckboxSelection -Names (Get-AllTweakNames) -State $false
+    Set-CheckboxSelection -Names @('chkPowerPlan', 'chkGameMode', 'chkMmcss', 'chkUsbSuspend', 'chkVisualFx', 'chkTelemetry', 'chkBackgroundApps')
+    Write-Log 'Preset Streaming ticked (Game DVR and capture stay enabled for clips). Press Apply to run it' 'OK'
+})
+$btnPresetCleanInstall.Add_Click({
+    Set-CheckboxSelection -Names (Get-AllTweakNames) -State $false
+    Set-CheckboxSelection -Names @('chkBloatBing', 'chkBloat3D', 'chkBloatGames', 'chkBloatCortana', 'chkTelemetry', 'chkServices', 'chkCortana', 'chkBackgroundApps', 'chkConsumer', 'chkActivity', 'chkWidgets', 'chkCopilot', 'chkRecall')
+    Write-Log 'Preset Clean Install Debloat ticked. Press Apply Selected Debloat Tweaks to run it' 'OK'
+})
+$btnPresetUncheckAll.Add_Click({
+    Set-CheckboxSelection -Names (Get-AllTweakNames) -State $false
+    Write-Log 'All tweak checkboxes cleared' 'OK'
+})
+
+$btnRevertBackup.Add_Click({
+    if ($null -eq $listBackups.SelectedItem) {
+        Write-Log 'Select a backup in the list first' 'WARN'
+        return
+    }
+    $backupPath = [string]$listBackups.SelectedItem.Tag
+    $question = 'Restore the previous state recorded in {0}?' -f [System.IO.Path]::GetFileName($backupPath)
+    if (Confirm-Action 'Revert changes' $question) {
+        Write-Log ('Reverting from {0} ...' -f [System.IO.Path]::GetFileName($backupPath))
+        if (Restore-BackupFile -File $backupPath) {
+            Write-Log 'Rollback completed. Reboot if services behave oddly.' 'OK'
+            Update-HardwareInfo
+        }
+    }
+})
+$btnRefreshBackups.Add_Click({ Update-BackupList })
+$btnOpenBackupFolder.Add_Click({
+    if (-not (Test-Path -LiteralPath $script:BackupRoot)) {
+        New-Item -Path $script:BackupRoot -ItemType Directory -Force -ErrorAction SilentlyContinue | Out-Null
+    }
+    Start-Process -FilePath 'explorer.exe' -ArgumentList $script:BackupRoot
+})
+
+$btnCheckUpdate.Add_Click({ Test-ForUpdate })
+$btnDoUpdate.Add_Click({
+    if (Confirm-Action 'Update BALDYBEAST OPTIMIZER' 'Download the newest version from GitHub and restart the tool?') {
+        Install-Update
+    }
+})
+
 # ----------------------------------------------------------------------------
 # Startup log
 # ----------------------------------------------------------------------------
@@ -1265,6 +1856,52 @@ if ($missingNames.Count -gt 0) {
 }
 
 # ----------------------------------------------------------------------------
+# Risk badges and tooltips: one plain sentence per option
+# ----------------------------------------------------------------------------
+$script:TweakInfo = @{
+    'chkPowerPlan'      = @('Safe', 'Keeps the CPU at full speed for games. Falls back to High Performance on Windows editions without Ultimate Performance.')
+    'chkMouseAccel'     = @('Safe', 'Turns off Enhance Pointer Precision so mouse movement matches physical distance one to one. Standard for FPS players.')
+    'chkGameMode'       = @('Safe', 'Lets Windows prioritize games and stops Game Bar popups.')
+    'chkVisualFx'       = @('Safe', 'Trades window animations for responsiveness. Font smoothing stays on.')
+    'chkUsbSuspend'     = @('Recommended', 'Stops Windows from sleeping USB devices so mouse polling stays steady. Slightly higher idle power draw.')
+    'chkGameDVR'        = @('Recommended', 'Disables background recording and Game DVR capture hooks. Skip this if you use Xbox Game Bar to record clips.')
+    'chkFullscreen'     = @('Recommended', 'Games render in exclusive fullscreen instead of a borderless hybrid, which lowers input lag.')
+    'chkMmcss'          = @('Recommended', 'Removes the multimedia network throttling limit and raises the Games task GPU and IO priority.')
+    'chkHAGS'           = @('Advanced', 'Lets the GPU manage its own memory scheduling. Needs a modern GPU driver and a reboot. Helps some rigs, hurts none.')
+    'chkBloatBing'      = @('Recommended', 'Removes Bing News, Bing Weather, Get Help, Get Started and the Office Hub from all users.')
+    'chkBloat3D'        = @('Recommended', 'Removes 3D Builder, 3D Viewer and the Mixed Reality Portal.')
+    'chkBloatGames'     = @('Recommended', 'Removes Solitaire and the old Xbox Console Companion. Game Bar and Gaming Services stay installed.')
+    'chkBloatMisc'      = @('Advanced', 'Removes consumer apps including Mail and Calendar. Skip this if you use them.')
+    'chkBloatCortana'   = @('Recommended', 'Removes the Cortana app package.')
+    'chkTelemetry'      = @('Recommended', 'Disables telemetry data collection, the DiagTrack service and CEIP scheduled tasks.')
+    'chkServices'       = @('Recommended', 'Disables Maps Broker, Retail Demo and WMP Network Sharing. None of them are needed for gaming.')
+    'chkCortana'        = @('Recommended', 'Disables Cortana and Bing web results inside the taskbar search.')
+    'chkBackgroundApps' = @('Recommended', 'Stops Store apps from running silently in the background.')
+    'chkConsumer'       = @('Recommended', 'Disables suggested apps, tips, ads in Start and tailored experiences.')
+    'chkActivity'       = @('Recommended', 'Stops Windows from collecting and uploading your activity history.')
+    'chkWidgets'        = @('Recommended', 'Removes the Widgets button and the News and Interests feed.')
+    'chkCopilot'        = @('Recommended', 'Disables the Windows Copilot button and feature.')
+    'chkRecall'         = @('Recommended', 'Prevents Windows Recall from snapshotting your screen and disables AI data analysis.')
+    'chkOneDrive'       = @('Advanced', 'Stops OneDrive from starting with Windows. Your files are untouched and you can re-enable it anytime.')
+}
+
+foreach ($infoEntry in $script:TweakInfo.GetEnumerator()) {
+    $infoControl = $window.FindName($infoEntry.Key)
+    if ($null -ne $infoControl) {
+        $infoControl.Tag = $infoEntry.Value[0]
+        $infoControl.ToolTip = ('{0}: {1}' -f $infoEntry.Value[0].ToUpper(), $infoEntry.Value[1])
+    }
+}
+
+# ----------------------------------------------------------------------------
+# Startup initialization
+# ----------------------------------------------------------------------------
+Update-HardwareInfo
+Update-ProfileList
+Update-BackupList
+Test-ForUpdate
+
+# ----------------------------------------------------------------------------
 # Validation hook (BALDYBEAST_VALIDATE=1) or show the GUI
 # ----------------------------------------------------------------------------
 if ($script:ValidateMode) {
@@ -1285,6 +1922,50 @@ if ($script:ValidateMode) {
         }
     } finally {
         Remove-Item -Path $testKey -Recurse -Force -ErrorAction SilentlyContinue
+    }
+
+    # Rollback round-trip: seed a value, overwrite through the backup-aware
+    # helper, revert, and confirm the seed came back
+    $rollbackKey = 'HKCU:\Software\BaldyBeastValidateTestRollback'
+    try {
+        New-Item -Path $rollbackKey -Force -ErrorAction Stop | Out-Null
+        New-ItemProperty -Path $rollbackKey -Name 'Seed' -Value 5 -PropertyType DWord -Force -ErrorAction Stop | Out-Null
+        Set-RegValue -Path $rollbackKey -Name 'Seed' -Value 9 | Out-Null
+        $sessionBackup = $script:BackupFile
+        $reverted = Restore-BackupFile -File $sessionBackup
+        $seedKey = Get-Item -Path $rollbackKey -ErrorAction SilentlyContinue
+        $seedNow = $null
+        if ($null -ne $seedKey) { $seedNow = $seedKey.GetValue('Seed') }
+        if ($reverted -and $seedNow -eq 5) {
+            Write-Host 'ROLLBACK TEST OK - previous registry state restored exactly' -ForegroundColor Green
+        } else {
+            Write-Host ('ROLLBACK TEST FAILED - seed is [{0}], reverted flag [{1}]' -f $seedNow, $reverted) -ForegroundColor Red
+        }
+        Remove-Item -Path $rollbackKey -Recurse -Force -ErrorAction SilentlyContinue
+        if (-not [string]::IsNullOrWhiteSpace($sessionBackup)) {
+            Remove-Item -LiteralPath $sessionBackup -Force -ErrorAction SilentlyContinue
+        }
+    } catch {
+        Write-Host ('ROLLBACK TEST FAILED: {0}' -f $_.Exception.Message) -ForegroundColor Red
+        Remove-Item -Path $rollbackKey -Recurse -Force -ErrorAction SilentlyContinue
+    }
+
+    # Profile round-trip: save a selection, clear it, load it back
+    try {
+        $probe = $window.FindName('chkPowerPlan')
+        $probe.IsChecked = $true
+        Save-CurrentProfile -Name 'selftest'
+        $probe.IsChecked = $false
+        Load-Profile -Name 'selftest'
+        if ($probe.IsChecked -eq $true) {
+            Write-Host 'PROFILE TEST OK - saved selection restored' -ForegroundColor Green
+        } else {
+            Write-Host 'PROFILE TEST FAILED - checkbox did not come back' -ForegroundColor Red
+        }
+        Remove-Profile -Name 'selftest'
+        $probe.IsChecked = $false
+    } catch {
+        Write-Host ('PROFILE TEST FAILED: {0}' -f $_.Exception.Message) -ForegroundColor Red
     }
 
     if ($missingNames.Count -gt 0) {
