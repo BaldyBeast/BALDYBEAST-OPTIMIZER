@@ -31,6 +31,13 @@ Or clone the repo and run the file directly:
 powershell -ExecutionPolicy Bypass -File Optimize.ps1
 ```
 
+## What's new in v1.7.1
+
+- **CDN-immune updates**: the update check now resolves the exact commit on
+  GitHub and downloads from that immutable URL, so a cached `main` can never
+  hand you an older version again. If you ever want a specific build right now,
+  run the one-liner with the commit SHA from the GitHub commit list.
+
 ## What's new in v1.7
 
 - **Diagnostics tab**: live stutter watch (DPC latency, disk queue, memory

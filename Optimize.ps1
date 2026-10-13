@@ -12,7 +12,7 @@
 
 $ErrorActionPreference = 'Continue'
 
-$script:AppVersion   = '1.7.0'
+$script:AppVersion   = '1.7.1'
 $script:RepoRawUrl   = 'https://raw.githubusercontent.com/BaldyBeast/BALDYBEAST-OPTIMIZER/main/Optimize.ps1'
 $script:LogFile      = Join-Path $env:TEMP 'BaldyBeast-Optimizer.log'
 $script:LogBox       = $null
@@ -23,6 +23,7 @@ $script:BackupRoot   = Join-Path $env:LOCALAPPDATA 'BaldyBeast\backups'
 $script:ProfileRoot  = Join-Path $env:LOCALAPPDATA 'BaldyBeast\profiles'
 $script:BackupFile   = $null
 $script:LatestVersion = $null
+$script:PinnedRawUrl = $null
 
 # ----------------------------------------------------------------------------
 # ASCII banner font (every cell is exactly 7 characters wide)
@@ -2070,9 +2071,26 @@ function Update-HardwareInfo {
 # ----------------------------------------------------------------------------
 # Self update
 # ----------------------------------------------------------------------------
+function Resolve-PinnedRawUrl {
+    # Resolve the immutable commit SHA first and fetch from that URL. The main
+    # URL sits behind a CDN cache that can serve an old version for minutes
+    # after a push, the SHA URL never does.
+    try {
+        $commit = Invoke-RestMethod -Uri 'https://api.github.com/repos/BaldyBeast/BALDYBEAST-OPTIMIZER/commits/main' -TimeoutSec 8 -ErrorAction Stop
+        $sha = [string]$commit.sha
+        if (-not [string]::IsNullOrWhiteSpace($sha)) {
+            $script:PinnedRawUrl = 'https://raw.githubusercontent.com/BaldyBeast/BALDYBEAST-OPTIMIZER/{0}/Optimize.ps1' -f $sha
+        }
+    } catch { }
+    if ([string]::IsNullOrWhiteSpace($script:PinnedRawUrl)) {
+        $script:PinnedRawUrl = $script:RepoRawUrl
+    }
+    return $script:PinnedRawUrl
+}
+
 function Test-ForUpdate {
     try {
-        $raw = Invoke-RestMethod -Uri $script:RepoRawUrl -TimeoutSec 8 -ErrorAction Stop
+        $raw = Invoke-RestMethod -Uri (Resolve-PinnedRawUrl) -TimeoutSec 8 -ErrorAction Stop
         $match = [regex]::Match([string]$raw, "AppVersion\s*=\s*'([0-9\.]+)'")
 
         if (-not $match.Success) {
@@ -2098,7 +2116,7 @@ function Test-ForUpdate {
 
 function Install-Update {
     try {
-        $raw = Invoke-RestMethod -Uri $script:RepoRawUrl -TimeoutSec 20 -ErrorAction Stop
+        $raw = Invoke-RestMethod -Uri (Resolve-PinnedRawUrl) -TimeoutSec 20 -ErrorAction Stop
         # Integrity sanity check: refuse to run anything that does not look like this tool
         $rawText = [string]$raw
         if ($rawText -notmatch 'BALDYBEAST OPTIMIZER' -or
