@@ -31,6 +31,21 @@ Or clone the repo and run the file directly:
 powershell -ExecutionPolicy Bypass -File Optimize.ps1
 ```
 
+## What's new in v1.7
+
+- **Diagnostics tab**: live stutter watch (DPC latency, disk queue, memory
+  pressure), packet loss and ping spike monitor, a 5 second bottleneck scanner
+  with a plain-English verdict, and a system health check covering disk health,
+  free space, dirty volume flag, ACPI thermals and the Windows image store.
+- **Windows repair**: `sfc /scannow` and `DISM /Online /Cleanup-Image /RestoreHealth`
+  buttons that run in their own windows, plus Full Repair (DISM then SFC, the
+  correct order).
+- **Fixed (again)**: dropdown text colors were still wrong in some states.
+  Foreground is now explicit at every template level (closed box, rows, selected
+  row).
+- **Fixed (again)**: the console now always closes with the GUI. Set
+  `BALDYBEAST_KEEP_SHELL=1` first if you want the shell to survive.
+
 ## What's new in v1.6
 
 - **Fixed**: dropdown menus (Windows Update, power plan, DNS) rendered white on

@@ -12,7 +12,7 @@
 
 $ErrorActionPreference = 'Continue'
 
-$script:AppVersion   = '1.6.0'
+$script:AppVersion   = '1.7.0'
 $script:RepoRawUrl   = 'https://raw.githubusercontent.com/BaldyBeast/BALDYBEAST-OPTIMIZER/main/Optimize.ps1'
 $script:LogFile      = Join-Path $env:TEMP 'BaldyBeast-Optimizer.log'
 $script:LogBox       = $null
@@ -289,13 +289,14 @@ $xamlA = @'
     </Style>
 
     <Style TargetType="ToggleButton" x:Key="ComboToggle">
+      <Setter Property="Foreground" Value="#FFE8E8F0"/>
       <Setter Property="Template">
         <Setter.Value>
           <ControlTemplate TargetType="ToggleButton">
             <Border x:Name="bd" Background="#FF0D0D14" BorderBrush="#FF3A3A52" BorderThickness="1"
                     CornerRadius="6" Padding="8,6">
               <Grid>
-                <ContentPresenter/>
+                <ContentPresenter TextElement.Foreground="#FFE8E8F0"/>
                 <Path HorizontalAlignment="Right" VerticalAlignment="Center" Fill="#FFB8B8CC"
                       Data="M 0 0 L 4 4 L 8 0 Z" Margin="0,0,4,0"/>
               </Grid>
@@ -326,7 +327,7 @@ $xamlA = @'
               <Setter.Value>
                 <ControlTemplate TargetType="ComboBoxItem">
                   <Border x:Name="itemBd" Background="Transparent" Padding="{TemplateBinding Padding}">
-                    <ContentPresenter/>
+                    <ContentPresenter x:Name="itemContent" TextElement.Foreground="#FFE8E8F0"/>
                   </Border>
                   <ControlTemplate.Triggers>
                     <Trigger Property="IsHighlighted" Value="True">
@@ -334,7 +335,7 @@ $xamlA = @'
                     </Trigger>
                     <Trigger Property="IsSelected" Value="True">
                       <Setter TargetName="itemBd" Property="Background" Value="#FFF59E0B"/>
-                      <Setter Property="Foreground" Value="#FF201500"/>
+                      <Setter TargetName="itemContent" Property="TextElement.Foreground" Value="#FF201500"/>
                     </Trigger>
                   </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -351,13 +352,14 @@ $xamlA = @'
                             IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}">
                 <ContentPresenter Content="{TemplateBinding SelectionBoxItem}"
                                   ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                  TextElement.Foreground="#FFE8E8F0"
                                   Margin="4,0,22,0" VerticalAlignment="Center"/>
               </ToggleButton>
               <Popup x:Name="PART_Popup" Placement="Bottom" AllowsTransparency="True"
                      IsOpen="{TemplateBinding IsDropDownOpen}" PopupAnimation="Fade">
                 <Border Background="#FF1F1F2E" BorderBrush="#FF3A3A52" BorderThickness="1" CornerRadius="6">
                   <ScrollViewer MaxHeight="260" VerticalScrollBarVisibility="Auto">
-                    <ItemsPresenter/>
+                    <ItemsPresenter TextElement.Foreground="#FFE8E8F0"/>
                   </ScrollViewer>
                 </Border>
               </Popup>
@@ -1056,6 +1058,47 @@ $xamlB = @'
                           Content="Auto-purge standby list when any listed game starts (tool must be open)"/>
                 <Button x:Name="btnApplyGame" Style="{StaticResource AccentButton}" Content="Apply to Selected Game"
                         HorizontalAlignment="Left" Margin="0,4,0,0"/>
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- ================= DIAGNOSTICS ================= -->
+      <TabItem Header="Diagnostics" Style="{StaticResource DarkTab}">
+        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="4">
+          <StackPanel>
+            <Border Style="{StaticResource Card}">
+              <StackPanel>
+                <TextBlock Style="{StaticResource CardHeader}" Text="Live Health Monitors"/>
+                <CheckBox x:Name="chkStutterWatch" Style="{StaticResource DarkCheck}"
+                          Content="Stutter watch (DPC latency, disk queue, memory pressure)"/>
+                <CheckBox x:Name="chkPingWatch" Style="{StaticResource DarkCheck}"
+                          Content="Packet loss monitor (pings gateway and Cloudflare every 15 s)"/>
+                <TextBlock Style="{StaticResource DimText}"
+                           Text="Monitors run while the tool is open and record risk events: driver latency spikes, a saturated disk, low memory or lost packets. Use them to see whether a stutter session lines up with the hardware, not with the game."/>
+                <WrapPanel>
+                  <Button x:Name="btnBottleneck" Style="{StaticResource AccentButton}" Content="Scan for Bottlenecks (5 s)" Margin="0,0,8,8"/>
+                  <Button x:Name="btnHealthCheck" Style="{StaticResource DarkButton}" Content="System Health Check" Margin="0,0,8,8"/>
+                  <Button x:Name="btnDiagClear" Style="{StaticResource DarkButton}" Content="Clear Stats" Margin="0,0,8,8"/>
+                </WrapPanel>
+                <TextBox x:Name="txtDiag" IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap"
+                         FontFamily="Consolas" FontSize="12" Background="#FF0D0D14" Foreground="#FFB8D8F0"
+                         BorderBrush="#FF3A3A52" Padding="10" MinHeight="250"
+                         VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"/>
+              </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource Card}">
+              <StackPanel>
+                <TextBlock Style="{StaticResource CardHeader}" Text="Windows Repair (SFC and DISM)"/>
+                <TextBlock Style="{StaticResource DimText}"
+                           Text="Repairs corrupted Windows system files and the component store. DISM fixes the store first, SFC then uses it to repair files, so that order matters. Each runs in its own window so this GUI stays responsive. The full repair takes 20 to 40 minutes."/>
+                <WrapPanel>
+                  <Button x:Name="btnRunSfc" Style="{StaticResource DarkButton}" Content="Run sfc /scannow" Margin="0,0,8,8"/>
+                  <Button x:Name="btnRunDism" Style="{StaticResource DarkButton}" Content="Run DISM RestoreHealth" Margin="0,0,8,8"/>
+                  <Button x:Name="btnRunRepairBoth" Style="{StaticResource DangerButton}" Content="Full Repair (DISM then SFC)" Margin="0,0,8,8"/>
+                </WrapPanel>
               </StackPanel>
             </Border>
           </StackPanel>
@@ -3189,6 +3232,10 @@ function Start-StandbyMonitor {
                 Test-GameLaunch
             }
 
+            if ($chkStutterWatch.IsChecked -or $chkPingWatch.IsChecked) {
+                Update-DiagMonitor
+            }
+
             if ($chkMonitorEnable.IsChecked -and $freeMb -lt $thresholdMb) {
                 $outcome = [BaldyBeast.Memory]::PurgeStandbyList()
                 if (((Get-Date) - $script:LastPurgeLog) -gt [TimeSpan]::FromSeconds(60)) {
@@ -3316,6 +3363,291 @@ function Import-ProfileFromUrl {
 }
 
 # ----------------------------------------------------------------------------
+# Diagnostics: stutter watch, ping watch, bottleneck scan, health, repair
+# ----------------------------------------------------------------------------
+$script:DiagStats = @{
+    Samples      = 0
+    DpcSpikes    = 0
+    QueueSpikes  = 0
+    LowMemEvents = 0
+    PingsSent    = 0
+    PingsLost    = 0
+    PingSum      = 0.0
+    PingMax      = 0.0
+    TickCount    = 0
+    Events       = New-Object System.Collections.ArrayList
+}
+
+function Add-DiagEvent([string]$Text) {
+    [void]$script:DiagStats.Events.Add(('{0} {1}' -f (Get-Date -Format 'HH:mm:ss'), $Text))
+    while ($script:DiagStats.Events.Count -gt 40) { $script:DiagStats.Events.RemoveAt(0) }
+}
+
+function Reset-DiagStats {
+    $script:DiagStats.Samples = 0
+    $script:DiagStats.DpcSpikes = 0
+    $script:DiagStats.QueueSpikes = 0
+    $script:DiagStats.LowMemEvents = 0
+    $script:DiagStats.PingsSent = 0
+    $script:DiagStats.PingsLost = 0
+    $script:DiagStats.PingSum = 0.0
+    $script:DiagStats.PingMax = 0.0
+    $script:DiagStats.Events.Clear()
+    Write-Log 'Diagnostic stats cleared' 'OK'
+}
+
+function Update-DiagMonitor {
+    try {
+        if ($chkStutterWatch.IsChecked) {
+            $counters = @(
+                '\Processor(_Total)\% Processor Time',
+                '\Processor(_Total)\% DPC Time',
+                '\PhysicalDisk(_Total)\Current Disk Queue Length',
+                '\Memory\Available MBytes'
+            )
+            $sample = Get-Counter -Counter $counters -ErrorAction Stop
+            $cpu = 0.0
+            $dpc = 0.0
+            $queue = 0.0
+            $availMb = 0.0
+            foreach ($s in $sample.CounterSamples) {
+                if ($s.Path -like '*\% DPC Time') { $dpc = $s.CookedValue }
+                elseif ($s.Path -like '*\% Processor Time') { $cpu = $s.CookedValue }
+                elseif ($s.Path -like '*Current Disk Queue Length') { $queue = $s.CookedValue }
+                elseif ($s.Path -like '*Available MBytes') { $availMb = $s.CookedValue }
+            }
+
+            $script:DiagStats.Samples++
+            if ($dpc -gt 10) {
+                $script:DiagStats.DpcSpikes++
+                Add-DiagEvent ('DPC latency spike {0:N1} percent (a driver is stalling)' -f $dpc)
+            }
+            if ($queue -gt 2 -and $cpu -gt 80) {
+                $script:DiagStats.QueueSpikes++
+                Add-DiagEvent ('disk queue {0:N1} while CPU at {1:N0} percent' -f $queue, $cpu)
+            }
+            if ($availMb -lt 500) {
+                $script:DiagStats.LowMemEvents++
+                Add-DiagEvent ('low memory: only {0:N0} MB free' -f $availMb)
+            }
+        }
+
+        if ($chkPingWatch.IsChecked) {
+            $script:DiagStats.TickCount++
+            if (($script:DiagStats.TickCount % 3) -eq 0) {
+                $targets = @('1.1.1.1')
+                try {
+                    $gateway = Get-NetIPConfiguration -ErrorAction SilentlyContinue |
+                        Where-Object { $null -ne $_.IPv4DefaultGateway } | Select-Object -First 1
+                    if ($null -ne $gateway) { $targets += $gateway.IPv4DefaultGateway.NextHop }
+                } catch { }
+
+                foreach ($target in $targets) {
+                    $replies = @(Test-Connection -ComputerName $target -Count 2 -ErrorAction SilentlyContinue)
+                    $script:DiagStats.PingsSent += 2
+                    $lost = 2 - $replies.Count
+                    $script:DiagStats.PingsLost += $lost
+                    if ($lost -gt 0) {
+                        Add-DiagEvent ('packet loss to {0}: {1} of 2 lost' -f $target, $lost)
+                    }
+                    foreach ($reply in $replies) {
+                        $script:DiagStats.PingSum += $reply.ResponseTime
+                        if ($reply.ResponseTime -gt $script:DiagStats.PingMax) { $script:DiagStats.PingMax = $reply.ResponseTime }
+                        if ($reply.ResponseTime -gt 100) {
+                            Add-DiagEvent ('ping spike to {0}: {1} ms' -f $target, $reply.ResponseTime)
+                        }
+                    }
+                }
+            }
+        }
+
+        if ($chkStutterWatch.IsChecked -or $chkPingWatch.IsChecked) {
+            $received = $script:DiagStats.PingsSent - $script:DiagStats.PingsLost
+            $avgPing = 0.0
+            if ($received -gt 0) { $avgPing = $script:DiagStats.PingSum / $received }
+
+            $lines = @()
+            $lines += ('STUTTER WATCH  samples {0} | DPC spikes {1} | disk queue spikes {2} | low mem events {3}' -f $script:DiagStats.Samples, $script:DiagStats.DpcSpikes, $script:DiagStats.QueueSpikes, $script:DiagStats.LowMemEvents)
+            $lines += ('PING WATCH     sent {0} | lost {1} ({2:N1} percent) | avg {3:N0} ms | max {4:N0} ms' -f $script:DiagStats.PingsSent, $script:DiagStats.PingsLost, $(if ($script:DiagStats.PingsSent -gt 0) { 100.0 * $script:DiagStats.PingsLost / $script:DiagStats.PingsSent } else { 0 }), $avgPing, $script:DiagStats.PingMax)
+            $lines += ''
+            $lines += 'RECENT EVENTS (oldest first):'
+            foreach ($entry in $script:DiagStats.Events) {
+                $lines += ('  ' + $entry)
+            }
+            if ($script:DiagStats.Events.Count -eq 0) {
+                $lines += '  (none, which is a good sign)'
+            }
+            $txtDiag.Text = ($lines -join [System.Environment]::NewLine)
+        }
+    } catch {
+        # perf counters unavailable on this system, monitor simply idles
+    }
+}
+
+function Invoke-BottleneckScan {
+    Write-Log 'Bottleneck scan: sampling for 5 seconds...'
+    $txtDiag.Text = 'Scanning for bottlenecks, hold tight...'
+    Update-Ui
+
+    $cpuList = @()
+    $dpcList = @()
+    $queueList = @()
+    $memList = @()
+    $idleList = @()
+
+    $counters = @(
+        '\Processor(_Total)\% Processor Time',
+        '\Processor(_Total)\% DPC Time',
+        '\PhysicalDisk(_Total)\Current Disk Queue Length',
+        '\PhysicalDisk(_Total)\% Idle Time',
+        '\Memory\Available MBytes'
+    )
+
+    for ($i = 0; $i -lt 10; $i++) {
+        try {
+            $sample = Get-Counter -Counter $counters -ErrorAction Stop
+            foreach ($s in $sample.CounterSamples) {
+                if ($s.Path -like '*\% DPC Time') { $dpcList += $s.CookedValue }
+                elseif ($s.Path -like '*\% Processor Time') { $cpuList += $s.CookedValue }
+                elseif ($s.Path -like '*Current Disk Queue Length') { $queueList += $s.CookedValue }
+                elseif ($s.Path -like '*\% Idle Time') { $idleList += $s.CookedValue }
+                elseif ($s.Path -like '*Available MBytes') { $memList += $s.CookedValue }
+            }
+        } catch { }
+        Start-Sleep -Milliseconds 500
+        Update-Ui
+    }
+
+    $cpuAvg = 0.0; if ($cpuList.Count -gt 0) { $cpuAvg = ($cpuList | Measure-Object -Average).Average }
+    $dpcAvg = 0.0; if ($dpcList.Count -gt 0) { $dpcAvg = ($dpcList | Measure-Object -Average).Average }
+    $queueAvg = 0.0; if ($queueList.Count -gt 0) { $queueAvg = ($queueList | Measure-Object -Average).Average }
+    $idleAvg = 100.0; if ($idleList.Count -gt 0) { $idleAvg = ($idleList | Measure-Object -Average).Average }
+    $memMin = 0.0; if ($memList.Count -gt 0) { $memMin = ($memList | Measure-Object -Minimum).Minimum }
+
+    $verdicts = @()
+    if ($cpuAvg -gt 85) {
+        $verdicts += ('CPU bound: processor averaged {0:N0} percent. Lower settings, cap FPS or upgrade.' -f $cpuAvg)
+    }
+    if ($queueAvg -gt 2 -or $idleAvg -lt 20) {
+        $verdicts += ('Disk bound: queue {0:N1}, disk only idle {1:N0} percent of the time. An SSD upgrade or less background IO would help.' -f $queueAvg, $idleAvg)
+    }
+    if ($memMin -lt 800) {
+        $verdicts += ('Memory pressure: {0:N0} MB free at the low point. Close apps or add RAM.' -f $memMin)
+    }
+    if ($dpcAvg -gt 3) {
+        $verdicts += ('Driver latency: DPC averaged {0:N1} percent. Update audio, network and GPU drivers.' -f $dpcAvg)
+    }
+    if ($verdicts.Count -eq 0) {
+        $verdicts += 'No obvious bottleneck in this window. If games still stutter, check per-game GPU settings and drivers.'
+    }
+
+    $lines = @()
+    $lines += ('BOTTLENECK SCAN  {0}' -f (Get-Date -Format 'HH:mm:ss'))
+    $lines += '---------------------------------------------------------'
+    $lines += ('CPU usage      : {0:N1} percent average' -f $cpuAvg)
+    $lines += ('DPC latency    : {0:N1} percent average' -f $dpcAvg)
+    $lines += ('Disk queue     : {0:N2} average' -f $queueAvg)
+    $lines += ('Disk idle      : {0:N0} percent average' -f $idleAvg)
+    $lines += ('Lowest free RAM: {0:N0} MB' -f $memMin)
+    $lines += ''
+    $lines += 'VERDICT:'
+    foreach ($verdict in $verdicts) {
+        $lines += ('  ' + $verdict)
+    }
+
+    $txtDiag.Text = ($lines -join [System.Environment]::NewLine)
+    Write-Log ('Bottleneck scan done: {0}' -f ($verdicts -join ' | ')) 'OK'
+}
+
+function Invoke-SystemHealthCheck {
+    Write-Log 'Running system health check (storage, thermal, image store)...'
+    $txtDiag.Text = 'Running system health check, this takes about half a minute...'
+    Update-Ui
+
+    $lines = @()
+    $lines += ('SYSTEM HEALTH CHECK  {0}' -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'))
+    $lines += '---------------------------------------------------------'
+
+    try {
+        foreach ($disk in (Get-PhysicalDisk -ErrorAction Stop)) {
+            $flag = ''
+            if ($disk.HealthStatus -ne 'Healthy') { $flag = '  PROBLEM' }
+            $lines += ('Disk {0} ({1}, {2:N0} GB): {3}{4}' -f $disk.FriendlyName, $disk.MediaType, ($disk.Size / 1GB), $disk.HealthStatus, $flag)
+        }
+    } catch {
+        $lines += 'Physical disk info unavailable'
+    }
+
+    try {
+        foreach ($volume in (Get-Volume -ErrorAction Stop | Where-Object { $null -ne $_.DriveLetter -and $_.Size -gt 0 })) {
+            $pctFree = 100.0 * ($volume.SizeRemaining / $volume.Size)
+            $flag = ''
+            if ($pctFree -lt 10) { $flag = '  LOW SPACE' }
+            $lines += ('Volume {0}: {1:N0} GB free of {2:N0} GB ({3:N0} percent){4}' -f ($volume.DriveLetter + ':'), ($volume.SizeRemaining / 1GB), ($volume.Size / 1GB), $pctFree, $flag)
+        }
+    } catch { }
+
+    try {
+        $dirty = & fsutil.exe dirty query $env:SystemDrive 2>&1 | Out-String
+        if ($dirty -match 'is Dirty') {
+            $lines += 'System volume dirty flag: SET (run chkdsk on next reboot)'
+        } else {
+            $lines += 'System volume dirty flag: clean'
+        }
+    } catch { }
+
+    try {
+        $zones = @(Get-CimInstance -Namespace 'root/wmi' -ClassName 'MSAcpi_ThermalZoneTemperature' -ErrorAction Stop)
+        foreach ($zone in $zones) {
+            $celsius = [math]::Round(($zone.CurrentTemperature / 10.0) - 273.15, 1)
+            $flag = ''
+            if ($celsius -gt 85) { $flag = '  RUNNING HOT' }
+            $lines += ('Thermal {0}: {1} C{2}' -f $zone.InstanceName, $celsius, $flag)
+        }
+        if ($zones.Count -eq 0) {
+            $lines += 'Thermal: no ACPI sensor exposed on this system'
+        }
+    } catch {
+        $lines += 'Thermal: no ACPI sensor exposed on this system'
+    }
+
+    try {
+        $dism = & dism.exe /Online /Cleanup-Image /CheckHealth 2>&1 | Out-String
+        if ($dism -match 'no component store corruption') {
+            $lines += 'Windows image store: healthy'
+        } elseif ($dism -match 'repairable') {
+            $lines += 'Windows image store: REPAIRABLE (run DISM RestoreHealth)'
+        } elseif ($dism -match 'corrupt') {
+            $lines += 'Windows image store: CORRUPT (run Full Repair)'
+        } else {
+            $lines += 'Windows image store: inconclusive, run sfc /scannow to verify'
+        }
+    } catch {
+        $lines += 'Windows image store: check failed'
+    }
+
+    $txtDiag.Text = ($lines -join [System.Environment]::NewLine)
+    Write-Log 'System health check finished' 'OK'
+}
+
+function Start-WindowsRepair {
+    param([ValidateSet('sfc', 'dism', 'both')][string]$Mode)
+
+    $inner = 'sfc.exe /scannow'
+    switch ($Mode) {
+        'dism' { $inner = 'DISM.exe /Online /Cleanup-Image /RestoreHealth' }
+        'both' { $inner = 'DISM.exe /Online /Cleanup-Image /RestoreHealth; sfc.exe /scannow' }
+    }
+
+    try {
+        Write-Log ('Opening repair console (mode: {0})...' -f $Mode) 'OK'
+        Start-Process -FilePath 'powershell.exe' -ArgumentList ('-NoProfile -Command "Write-Host ''BALDYBEAST repair running, keep this window open...''; {0}; Write-Host ''Repair finished. You can close this window.''"' -f $inner) | Out-Null
+    } catch {
+        Write-Log ('Could not start repair: {0}' -f $_.Exception.Message) 'ERROR'
+    }
+}
+
+# ----------------------------------------------------------------------------
 # Build the WPF window
 # ----------------------------------------------------------------------------
 Add-Type -AssemblyName PresentationFramework
@@ -3369,7 +3701,9 @@ $controlNames = @(
     'cmbWuDefer', 'chkWuNoDrivers', 'chkWuNoReboot', 'btnApplyWu',
     'sldCpuMin', 'sldCpuMax', 'cmbPcie', 'sldDisplayOff', 'btnApplyPower',
     'chkMonitorEnable', 'sldMonitorThreshold', 'txtMonitorStatus',
-    'chkTrayMode', 'chkGameDetect', 'txtPresetUrl', 'btnPresetImport'
+    'chkTrayMode', 'chkGameDetect', 'txtPresetUrl', 'btnPresetImport',
+    'txtDiag', 'chkStutterWatch', 'chkPingWatch', 'btnBottleneck', 'btnHealthCheck', 'btnDiagClear',
+    'btnRunSfc', 'btnRunDism', 'btnRunRepairBoth'
 )
 
 $missingNames = @()
@@ -3441,6 +3775,12 @@ Tray, profiles and convenience:
   standby list automatically when a listed game starts, and share profiles as
   JSON files loaded straight from a URL. Closing the window also closes the
   console it was launched in.
+
+Diagnostics:
+  The Diagnostics tab watches for stutter risk (driver latency, disk queue,
+  low memory), tracks packet loss and ping spikes, scans for bottlenecks,
+  checks storage health, temperatures and the Windows image store, and runs
+  sfc /scannow and DISM RestoreHealth in their own windows.
 
 One line install from GitHub:
   irm "$($script:RepoRawUrl)" | iex
@@ -3716,6 +4056,28 @@ $btnPresetImport.Add_Click({
     Import-ProfileFromUrl -Url $txtPresetUrl.Text
 })
 
+$btnBottleneck.Add_Click({ Invoke-BottleneckScan })
+$btnHealthCheck.Add_Click({ Invoke-SystemHealthCheck })
+$btnDiagClear.Add_Click({
+    Reset-DiagStats
+    $txtDiag.Text = ''
+})
+$btnRunSfc.Add_Click({
+    if (Confirm-Action 'Run sfc /scannow' 'Scan all protected Windows system files and repair the ones that are wrong? It runs in its own window and takes 10 to 20 minutes.') {
+        Start-WindowsRepair -Mode 'sfc'
+    }
+})
+$btnRunDism.Add_Click({
+    if (Confirm-Action 'Run DISM RestoreHealth' 'Scan the Windows component store for corruption and repair it from Windows Update? It runs in its own window and takes 10 to 20 minutes.') {
+        Start-WindowsRepair -Mode 'dism'
+    }
+})
+$btnRunRepairBoth.Add_Click({
+    if (Confirm-Action 'Full repair' 'Run DISM RestoreHealth first and then sfc /scannow? The correct order, in their own window. Expect 20 to 40 minutes in total.') {
+        Start-WindowsRepair -Mode 'both'
+    }
+})
+
 $window.Add_StateChanged({ Handle-WindowState })
 $window.Add_Closed({
     if ($null -ne $script:TrayIcon) {
@@ -3787,6 +4149,8 @@ $script:TweakInfo = @{
     'chkWuNoReboot'     = @('Safe', 'Windows will never restart the PC on its own while you are signed in.')
     'chkTrayMode'       = @('Safe', 'Minimize to the system tray instead of the taskbar, with quick purge and exit actions.')
     'chkGameDetect'     = @('Safe', 'When a game from the list starts, the standby list is purged so the game gets clean memory. The tool must stay open.')
+    'chkStutterWatch'   = @('Safe', 'Samples driver latency, disk queue and free memory every few seconds and logs risk events while the tool is open.')
+    'chkPingWatch'      = @('Safe', 'Pings your gateway and Cloudflare periodically and tracks packet loss and latency spikes while the tool is open.')
 }
 
 foreach ($infoEntry in $script:TweakInfo.GetEnumerator()) {
@@ -3805,27 +4169,9 @@ try {
     [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
 } catch { }
 
-# Detect a console that was spawned just for this tool (shortcut, relaunch,
-# powershell -File). Those close with the GUI so nobody has to click twice.
-# A shell the user typed the one-liner into is never closed.
-$script:OwnConsole = $false
-try {
-    if (-not [string]::IsNullOrWhiteSpace($PSCommandPath)) {
-        $hostArgs = [Environment]::GetCommandLineArgs()
-        for ($i = 0; $i -lt $hostArgs.Count - 1; $i++) {
-            if ($hostArgs[$i] -ieq '-File') {
-                $candidate = $hostArgs[$i + 1]
-                $sameFile = $false
-                try {
-                    $sameFile = ([System.IO.Path]::GetFullPath($candidate) -ieq [System.IO.Path]::GetFullPath($PSCommandPath))
-                } catch { }
-                if ($sameFile -or ((Split-Path -Leaf $candidate) -ieq (Split-Path -Leaf $PSCommandPath))) {
-                    $script:OwnConsole = $true
-                }
-            }
-        }
-    }
-} catch { }
+# Detect nothing fancy here: closing the GUI always shuts the host console
+# down as well (see the end of this script). Set BALDYBEAST_KEEP_SHELL=1 first
+# if you are developing and want the shell to survive.
 
 Set-TweakAvailability
 Update-HardwareInfo
@@ -4017,7 +4363,8 @@ if ($script:ValidateMode) {
 Write-Log 'GUI ready. Create a restore point first, then apply your tweaks.' 'INFO'
 [void]$window.ShowDialog()
 
-# GUI closed. Shut down the console window too when it belongs to this tool.
-if ($script:OwnConsole) {
+# GUI closed. Shut the host console down too, so nobody has to click twice.
+# Set BALDYBEAST_KEEP_SHELL=1 before launching to keep the shell alive.
+if ($env:BALDYBEAST_KEEP_SHELL -ne '1') {
     exit
 }
