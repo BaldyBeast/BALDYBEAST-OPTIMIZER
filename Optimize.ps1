@@ -12,7 +12,7 @@
 
 $ErrorActionPreference = 'Continue'
 
-$script:AppVersion   = '1.8.0'
+$script:AppVersion   = '1.9.0'
 $script:RepoRawUrl   = 'https://raw.githubusercontent.com/BaldyBeast/BALDYBEAST-OPTIMIZER/main/Optimize.ps1'
 $script:LogFile      = Join-Path $env:TEMP 'BaldyBeast-Optimizer.log'
 $script:LogBox       = $null
@@ -1083,10 +1083,47 @@ $xamlB = @'
                   <Button x:Name="btnHealthCheck" Style="{StaticResource DarkButton}" Content="System Health Check" Margin="0,0,8,8"/>
                   <Button x:Name="btnDiagClear" Style="{StaticResource DarkButton}" Content="Clear Stats" Margin="0,0,8,8"/>
                 </WrapPanel>
+                <TextBlock Style="{StaticResource DimText}"
+                           Text="Latency chart: last 90 samples of the packet loss monitor. Red marks are lost packets."/>
+                <Canvas x:Name="chartLatency" Height="90" Background="#FF0D0D14"/>
                 <TextBox x:Name="txtDiag" IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap"
                          FontFamily="Consolas" FontSize="12" Background="#FF0D0D14" Foreground="#FFB8D8F0"
                          BorderBrush="#FF3A3A52" Padding="10" MinHeight="250"
                          VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"/>
+              </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource Card}">
+              <StackPanel>
+                <TextBlock Style="{StaticResource CardHeader}" Text="Deep Reports"/>
+                <TextBlock Style="{StaticResource DimText}"
+                           Text="Read-only investigations. Each writes its report into the box above."/>
+                <WrapPanel>
+                  <Button x:Name="btnEventScan" Style="{StaticResource DarkButton}" Content="Scan Event Logs (48 h)" Margin="0,0,8,8"/>
+                  <Button x:Name="btnDriverReport" Style="{StaticResource DarkButton}" Content="Driver Age Report" Margin="0,0,8,8"/>
+                  <Button x:Name="btnStorageDeep" Style="{StaticResource DarkButton}" Content="Disk SMART and Latency" Margin="0,0,8,8"/>
+                  <Button x:Name="btnTopHogs" Style="{StaticResource DarkButton}" Content="Top Resource Users" Margin="0,0,8,8"/>
+                  <Button x:Name="btnTimerRes" Style="{StaticResource DarkButton}" Content="Timer Resolution" Margin="0,0,8,8"/>
+                </WrapPanel>
+              </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource Card}">
+              <StackPanel>
+                <TextBlock Style="{StaticResource CardHeader}" Text="Stress and Network Tests"/>
+                <TextBlock Style="{StaticResource DimText}"
+                           Text="The throttle test pushes all cores for 20 seconds to see if clock speeds collapse. The DNS race measures real lookups against four resolvers."/>
+                <WrapPanel>
+                  <Button x:Name="btnThrottleTest" Style="{StaticResource AccentButton}" Content="Thermal Throttle Test (20 s)" Margin="0,0,8,8"/>
+                  <Button x:Name="btnDnsRace" Style="{StaticResource DarkButton}" Content="DNS Race (4 resolvers)" Margin="0,0,8,8"/>
+                </WrapPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                  <TextBox x:Name="txtPingTarget" Width="220" Padding="7" FontSize="12"
+                           Background="#FF0D0D14" Foreground="#FFE8E8F0" BorderBrush="#FF3A3A52"
+                           ToolTip="IP address or hostname, for example your game server"/>
+                  <Button x:Name="btnPingAdd" Style="{StaticResource DarkButton}" Content="Add Ping Target" Margin="8,0,0,0"/>
+                </StackPanel>
+                <TextBlock x:Name="txtPingTargets" Style="{StaticResource DimText}" Text="Monitoring: 1.1.1.1"/>
               </StackPanel>
             </Border>
 
@@ -2826,6 +2863,34 @@ public static long GetFreeMemoryMb()
 '@
 }
 
+if (-not ('BaldyBeast.TimeInfo' -as [type])) {
+    Add-Type -Namespace BaldyBeast -Name TimeInfo -MemberDefinition @'
+[DllImport("ntdll.dll")]
+public static extern int NtQueryTimerResolution(out long minimum, out long maximum, out long current);
+
+public static double GetCurrentTimerMs()
+{
+    long min, max, cur;
+    NtQueryTimerResolution(out min, out max, out cur);
+    return cur / 10000.0;
+}
+
+public static double GetMinTimerMs()
+{
+    long min, max, cur;
+    NtQueryTimerResolution(out min, out max, out cur);
+    return min / 10000.0;
+}
+
+public static double GetMaxTimerMs()
+{
+    long min, max, cur;
+    NtQueryTimerResolution(out min, out max, out cur);
+    return max / 10000.0;
+}
+'@
+}
+
 function Update-MemoryInfo {
     try {
         $os = Get-CimInstance -ClassName Win32_OperatingSystem -ErrorAction Stop
@@ -3389,6 +3454,7 @@ $script:WorkerState = [hashtable]::Synchronized(@{
     Reset       = $false
     MonitorText = 'Monitor idle.'
     DisplayText = ''
+    LatencyHistory = [System.Collections.ArrayList]::Synchronized((New-Object System.Collections.ArrayList))
 })
 
 function Start-BackgroundWorker {
@@ -3417,6 +3483,7 @@ function Start-BackgroundWorker {
                     $stats = @{ Samples = 0; DpcSpikes = 0; QueueSpikes = 0; LowMem = 0; Sent = 0; Lost = 0; Sum = 0.0; Max = 0.0 }
                     $events.Clear()
                     $gamesSeen = @{}
+                    $state.LatencyHistory.Clear()
                     $state.Reset = $false
                     $state.DisplayText = ''
                 }
@@ -3458,20 +3525,27 @@ function Start-BackgroundWorker {
                 }
 
                 if ($state.Ping -and ($tick % 3) -eq 0) {
-                    foreach ($target in @($state.PingTargets)) {
+                    $targets = @($state.PingTargets)
+                    foreach ($target in $targets) {
                         try {
                             $ping = New-Object System.Net.NetworkInformation.Ping
                             $reply = $ping.Send([string]$target, 1500)
                             $stats.Sent++
+                            $ms = -1
                             if ($reply.Status -eq 'Success') {
-                                $stats.Sum += $reply.RoundtripTime
-                                if ($reply.RoundtripTime -gt $stats.Max) { $stats.Max = $reply.RoundtripTime }
-                                if ($reply.RoundtripTime -gt 100) {
-                                    Add-WorkerEvent ('ping spike to {0}: {1} ms' -f $target, $reply.RoundtripTime)
+                                $ms = $reply.RoundtripTime
+                                $stats.Sum += $ms
+                                if ($ms -gt $stats.Max) { $stats.Max = $ms }
+                                if ($ms -gt 100) {
+                                    Add-WorkerEvent ('ping spike to {0}: {1} ms' -f $target, $ms)
                                 }
                             } else {
                                 $stats.Lost++
                                 Add-WorkerEvent ('packet loss to {0}' -f $target)
+                            }
+                            if ($target -eq $targets[0]) {
+                                [void]$state.LatencyHistory.Add($ms)
+                                while ($state.LatencyHistory.Count -gt 90) { $state.LatencyHistory.RemoveAt(0) }
                             }
                         } catch { }
                     }
@@ -3560,6 +3634,427 @@ function Sync-MonitorUi {
     if ($display -and ($state.Stutter -or $state.Ping) -and $txtDiag.Text -ne $display) {
         $txtDiag.Text = $display
     }
+
+    Draw-LatencyChart
+}
+
+function Draw-LatencyChart {
+    try {
+        $canvas = $chartLatency
+        if ($null -eq $canvas) { return }
+        $canvas.Children.Clear()
+
+        $points = @($script:WorkerState.LatencyHistory)
+        if ($points.Count -lt 2) { return }
+
+        $w = $canvas.ActualWidth
+        $h = $canvas.ActualHeight
+        if ($w -lt 20 -or $h -lt 20) { return }
+
+        $good = @($points | Where-Object { $_ -ge 0 })
+        $maxMs = 50.0
+        if ($good.Count -gt 0) {
+            $peak = [double]($good | Measure-Object -Maximum).Maximum
+            if ($peak -gt $maxMs) { $maxMs = $peak * 1.2 }
+        }
+
+        $pointCollection = New-Object System.Windows.Media.PointCollection
+        for ($i = 0; $i -lt $points.Count; $i++) {
+            $x = ($i / [double]($points.Count - 1)) * $w
+            $ms = [double]$points[$i]
+            if ($ms -lt 0) {
+                $mark = New-Object System.Windows.Shapes.Rectangle
+                $mark.Width = 3
+                $mark.Height = 8
+                $mark.Fill = [System.Windows.Media.Brushes]::Red
+                [System.Windows.Controls.Canvas]::SetLeft($mark, ($x - 1.5))
+                [System.Windows.Controls.Canvas]::SetTop($mark, ($h - 10))
+                [void]$canvas.Children.Add($mark)
+            } else {
+                $y = $h - ([math]::Min($ms, $maxMs) / $maxMs) * ($h - 6) - 3
+                [void]$pointCollection.Add((New-Object System.Windows.Point($x, $y)))
+            }
+        }
+
+        if ($pointCollection.Count -gt 1) {
+            $poly = New-Object System.Windows.Shapes.Polyline
+            $poly.Stroke = [System.Windows.Media.Brushes]::Orange
+            $poly.StrokeThickness = 2
+            $poly.StrokeLineJoin = 'Round'
+            $poly.Points = $pointCollection
+            [void]$canvas.Children.Add($poly)
+        }
+    } catch { }
+}
+
+function Scan-EventLogs {
+    Write-Log 'Scanning Windows event logs (48 hours)...'
+    $txtDiag.Text = 'Scanning event logs, a moment...'
+    Update-Ui
+
+    $since = (Get-Date).AddHours(-48)
+    $events = @()
+    try { $events += @(Get-WinEvent -FilterHashtable @{ LogName = 'System'; Level = 1, 2; StartTime = $since } -ErrorAction SilentlyContinue) } catch { }
+    try { $events += @(Get-WinEvent -FilterHashtable @{ LogName = 'Application'; Level = 1, 2; StartTime = $since } -ErrorAction SilentlyContinue) } catch { }
+
+    $buckets = @(
+        @{ Label = 'Display driver resets (TDR)'; Note = 'classic stutter and freeze cause, update the GPU driver'; Match = { param($e) ($e.ProviderName -eq 'Display') -or ($e.Id -eq 4101) -or ($e.ProviderName -like '*nvlddmkm*') } },
+        @{ Label = 'Disk and file system errors'; Note = 'back up important data and check the drive with the SMART report'; Match = { param($e) $e.ProviderName -in @('disk', 'Ntfs', 'storahci', 'stornvme', 'volmgr', 'iaStorAC', 'iaStorA') } },
+        @{ Label = 'Unexpected shutdowns / bugchecks'; Note = 'the PC crashed or lost power, not a normal shutdown'; Match = { param($e) ($e.ProviderName -eq 'Microsoft-Windows-Kernel-Power' -and $e.Id -eq 41) -or ($e.ProviderName -eq 'Microsoft-Windows-WER-SystemErrorReporting') } },
+        @{ Label = 'Application crashes'; Note = 'apps that died, usually fixable with an update or reinstall'; Match = { param($e) ($e.ProviderName -eq 'Application Error') -or ($e.ProviderName -eq 'Windows Error Reporting') } },
+        @{ Label = 'Out of memory events'; Note = 'Windows ran out of memory, add RAM or close background apps'; Match = { param($e) $e.ProviderName -like '*Resource-Exhaustion*' } }
+    )
+
+    $lines = @()
+    $lines += ('EVENT LOG SCAN  last 48 hours, {0} critical or error events found' -f $events.Count)
+    $lines += '---------------------------------------------------------'
+
+    $totalFlagged = 0
+    foreach ($bucket in $buckets) {
+        $hits = @($events | Where-Object { & $bucket.Match $_ })
+        $totalFlagged += $hits.Count
+        if ($hits.Count -eq 0) {
+            $lines += ('{0,-38}: none' -f $bucket.Label)
+        } else {
+            $lines += ('{0,-38}: {1} found  ({2})' -f $bucket.Label, $hits.Count, $bucket.Note)
+            foreach ($hit in ($hits | Select-Object -First 2)) {
+                $msg = ([string]$hit.Message) -replace '\s+', ' '
+                if ($msg.Length -gt 110) { $msg = $msg.Substring(0, 110) + '...' }
+                $lines += ('    {0} {1} id {2}: {3}' -f $hit.TimeCreated.ToString('MM-dd HH:mm'), $hit.ProviderName, $hit.Id, $msg)
+            }
+        }
+    }
+
+    $lines += ''
+    if ($totalFlagged -eq 0) {
+        $lines += 'VERDICT: no known problem signatures in 48 hours. Clean.'
+    } else {
+        $lines += ('VERDICT: {0} problem events. Start with the GPU driver for display resets, and run the SMART report for disk errors.' -f $totalFlagged)
+    }
+
+    $txtDiag.Text = ($lines -join [System.Environment]::NewLine)
+    Write-Log ('Event log scan done: {0} problem events' -f $totalFlagged) 'OK'
+}
+
+function Show-DriverReport {
+    Write-Log 'Collecting driver versions and dates...'
+    $txtDiag.Text = 'Collecting driver report...'
+    Update-Ui
+
+    $lines = @()
+    $lines += ('DRIVER AGE REPORT  {0}' -f (Get-Date -Format 'yyyy-MM-dd'))
+    $lines += '---------------------------------------------------------'
+
+    $classes = @('DISPLAY', 'MEDIA', 'NET')
+    $rows = @()
+    try {
+        $rows = @(Get-CimInstance -ClassName Win32_PnPSignedDriver -ErrorAction Stop |
+            Where-Object { $_.DeviceClass -in $classes -and $null -ne $_.DriverDate } |
+            Select-Object DeviceName, DriverVersion, DriverDate -First 12)
+    } catch {
+        $lines += 'Driver query failed on this system'
+    }
+
+    foreach ($row in $rows) {
+        $ageDays = [int]((Get-Date) - $row.DriverDate).TotalDays
+        $flag = ''
+        if ($ageDays -gt 365) { $flag = '  VERY OLD' }
+        elseif ($ageDays -gt 180) { $flag = '  aging' }
+        $name = [string]$row.DeviceName
+        if ($name.Length -gt 34) { $name = $name.Substring(0, 34) + '...' }
+        $lines += ('{0,-36} {1}  {2:yyyy-MM-dd} ({3} days){4}' -f $name, $row.DriverVersion, $row.DriverDate, $ageDays, $flag)
+    }
+
+    if ($rows.Count -eq 0) {
+        $lines += 'No dated drivers found'
+    }
+
+    $lines += ''
+    $lines += 'VERDICT: anything marked VERY OLD is worth updating first, GPU drivers above all.'
+
+    $txtDiag.Text = ($lines -join [System.Environment]::NewLine)
+    Write-Log 'Driver age report finished' 'OK'
+}
+
+function Show-SmartReport {
+    Write-Log 'Collecting disk SMART data and latency...'
+    $txtDiag.Text = 'Collecting disk SMART data...'
+    Update-Ui
+
+    $lines = @()
+    $lines += ('DISK SMART AND LATENCY  {0}' -f (Get-Date -Format 'yyyy-MM-dd HH:mm'))
+    $lines += '---------------------------------------------------------'
+
+    try {
+        foreach ($disk in (Get-PhysicalDisk -ErrorAction Stop)) {
+            $lines += ('Disk: {0} ({1}, {2:N0} GB) health {3}' -f $disk.FriendlyName, $disk.MediaType, ($disk.Size / 1GB), $disk.HealthStatus)
+            try {
+                $rel = $disk | Get-StorageReliabilityCounter -ErrorAction Stop
+                if ($null -ne $rel) {
+                    if ($null -ne $rel.Temperature) {
+                        $flag = ''
+                        if ($rel.Temperature -gt 55) { $flag = '  HOT' }
+                        $lines += ('    temperature     : {0} C{1}' -f $rel.Temperature, $flag)
+                    }
+                    if ($null -ne $rel.Wear) { $lines += ('    wear            : {0} percent' -f $rel.Wear) }
+                    if ($null -ne $rel.PowerOnHours) { $lines += ('    power on hours  : {0}' -f $rel.PowerOnHours) }
+                    if ($null -ne $rel.ReadErrorsTotal) {
+                        $flag = ''
+                        if ($rel.ReadErrorsTotal -gt 0) { $flag = '  PROBLEM' }
+                        $lines += ('    read errors     : {0}{1}' -f $rel.ReadErrorsTotal, $flag)
+                    }
+                    if ($null -ne $rel.WriteErrorsTotal) {
+                        $flag = ''
+                        if ($rel.WriteErrorsTotal -gt 0) { $flag = '  PROBLEM' }
+                        $lines += ('    write errors    : {0}{1}' -f $rel.WriteErrorsTotal, $flag)
+                    }
+                }
+            } catch {
+                $lines += '    (no reliability counters exposed)'
+            }
+        }
+    } catch {
+        $lines += 'Physical disk query failed'
+    }
+
+    $lines += ''
+    $lines += 'Live latency (2 second sample):'
+    try {
+        $sample = Get-Counter -Counter @('\PhysicalDisk(*)\Avg. Disk sec/Read', '\PhysicalDisk(*)\Avg. Disk sec/Write') -ErrorAction Stop
+        foreach ($s in $sample.CounterSamples) {
+            if ($s.CookedValue -le 0) { continue }
+            $label = ($s.Path -replace '^.*\{', '') -replace '\}.*', ''
+            if ($s.Path -like '*sec/Read') {
+                $lines += ('    {0,-20} read  {1,7:N2} ms' -f $label, ($s.CookedValue * 1000))
+            } else {
+                $lines += ('    {0,-20} write {1,7:N2} ms' -f $label, ($s.CookedValue * 1000))
+            }
+        }
+    } catch {
+        $lines += '    (latency counters unavailable)'
+    }
+
+    $lines += ''
+    $lines += 'VERDICT: read latency under 1 ms is SSD class, above 10 ms is old hard drive territory.'
+
+    $txtDiag.Text = ($lines -join [System.Environment]::NewLine)
+    Write-Log 'Disk SMART report finished' 'OK'
+}
+
+function Show-TopHogs {
+    Write-Log 'Sampling top resource users...'
+    $txtDiag.Text = 'Sampling for 2 seconds...'
+    Update-Ui
+
+    try {
+        $before = @{}
+        foreach ($proc in (Get-Process -ErrorAction SilentlyContinue)) {
+            try { $before[$proc.Id] = $proc.TotalProcessorTime.TotalMilliseconds } catch { }
+        }
+        Start-Sleep -Seconds 2
+
+        $cpuRows = @()
+        $ramRows = @()
+        foreach ($proc in (Get-Process -ErrorAction SilentlyContinue)) {
+            try {
+                $ramRows += [pscustomobject]@{ Name = $proc.ProcessName; RamMb = ($proc.WorkingSet64 / 1MB) }
+                if ($before.ContainsKey($proc.Id)) {
+                    $delta = $proc.TotalProcessorTime.TotalMilliseconds - $before[$proc.Id]
+                    if ($delta -gt 0) {
+                        $cpuPct = ($delta / 2000.0) * 100.0
+                        $cpuRows += [pscustomobject]@{ Name = $proc.ProcessName; CpuPct = $cpuPct }
+                    }
+                }
+            } catch { }
+        }
+
+        $lines = @()
+        $lines += ('TOP RESOURCE USERS  {0}' -f (Get-Date -Format 'HH:mm:ss'))
+        $lines += '---------------------------------------------------------'
+        $lines += 'CPU over the last 2 seconds:'
+        foreach ($row in ($cpuRows | Sort-Object CpuPct -Descending | Select-Object -First 5)) {
+            $lines += ('    {0,-28} {1,6:N1} percent' -f $row.Name, $row.CpuPct)
+        }
+        $lines += 'Memory working set:'
+        foreach ($row in ($ramRows | Sort-Object RamMb -Descending | Select-Object -First 5)) {
+            $lines += ('    {0,-28} {1,7:N0} MB' -f $row.Name, $row.RamMb)
+        }
+        $lines += ''
+        $lines += 'VERDICT: if one process owns the CPU or disk while you game, cap it or close it.'
+
+        $txtDiag.Text = ($lines -join [System.Environment]::NewLine)
+        Write-Log 'Top resource users sampled' 'OK'
+    } catch {
+        Write-Log ('Top hogs failed: {0}' -f $_.Exception.Message) 'ERROR'
+    }
+}
+
+function Show-TimerResolution {
+    try {
+        $cur = [BaldyBeast.TimeInfo]::GetCurrentTimerMs()
+        $min = [BaldyBeast.TimeInfo]::GetMinTimerMs()
+        $max = [BaldyBeast.TimeInfo]::GetMaxTimerMs()
+
+        $lines = @()
+        $lines += 'TIMER RESOLUTION'
+        $lines += '---------------------------------------------------------'
+        $lines += ('current : {0:N3} ms' -f $cur)
+        $lines += ('finest  : {0:N3} ms' -f $min)
+        $lines += ('coarsest: {0:N3} ms' -f $max)
+        $lines += ''
+        if ($cur -gt 2.0) {
+            $lines += 'VERDICT: the system timer is coarse. Games and apps that request finer timing get it while they run, so this is informational only.'
+        } else {
+            $lines += 'VERDICT: fine timer resolution is active.'
+        }
+
+        $txtDiag.Text = ($lines -join [System.Environment]::NewLine)
+        Write-Log ('Timer resolution: {0:N3} ms' -f $cur) 'OK'
+    } catch {
+        Write-Log ('Timer resolution query failed: {0}' -f $_.Exception.Message) 'ERROR'
+    }
+}
+
+function Invoke-ThrottleTest {
+    Write-Log 'Thermal throttle test: 20 seconds of sustained CPU load...'
+    $txtDiag.Text = 'Thermal throttle test running: 20 s of full CPU load. Do not be alarmed by the fan noise.'
+    Update-Ui
+
+    $threads = [Environment]::ProcessorCount
+    $pool = [runspacefactory]::CreateRunspacePool(1, $threads)
+    $pool.Open()
+    $pipes = @()
+    $burn = {
+        param($seconds)
+        $sw = [System.Diagnostics.Stopwatch]::StartNew()
+        $acc = 0.0
+        while ($sw.Elapsed.TotalSeconds -lt $seconds) {
+            for ($i = 1; $i -le 200000; $i++) { $acc = $acc + $i * 1.5 }
+        }
+        return $acc
+    }
+    for ($t = 0; $t -lt $threads; $t++) {
+        $ps = [powershell]::Create()
+        $ps.RunspacePool = $pool
+        [void]$ps.AddScript($burn).AddArgument(20)
+        $pipes += [pscustomobject]@{ Pipe = $ps; Handle = $ps.BeginInvoke() }
+    }
+
+    $series = @()
+    for ($s = 0; $s -lt 10; $s++) {
+        Start-Sleep -Seconds 2
+        try {
+            $sample = Get-Counter -Counter '\Processor(_Total)\% Processor Performance' -ErrorAction Stop
+            $series += [double]$sample.CounterSamples[0].CookedValue
+        } catch { }
+        $txtDiag.Text = ('Thermal throttle test: {0}/20 s, processor performance right now: {1:N0} percent of nominal' -f (($s + 1) * 2), ($series | Select-Object -Last 1))
+        Update-Ui
+    }
+
+    foreach ($p in $pipes) {
+        try { $p.Pipe.EndInvoke($p.Handle) | Out-Null; $p.Pipe.Dispose() } catch { }
+    }
+    $pool.Close()
+
+    $lines = @()
+    $lines += 'THERMAL THROTTLE TEST  (20 s sustained load)'
+    $lines += '---------------------------------------------------------'
+    if ($series.Count -ge 2) {
+        $first = ($series | Select-Object -First 2 | Measure-Object -Average).Average
+        $last = ($series | Select-Object -Last 2 | Measure-Object -Average).Average
+        $lines += ('processor performance: start {0:N0} percent, end {1:N0} percent of nominal clock' -f $first, $last)
+        $drop = $first - $last
+        if ($drop -gt 25) {
+            $lines += ('VERDICT: performance dropped {0:N0} points under load. That is thermal or power throttling.' -f $drop)
+        } elseif ($drop -gt 10) {
+            $lines += ('VERDICT: mild drop of {0:N0} points. Usable, but cooling headroom is limited.' -f $drop)
+        } else {
+            $lines += 'VERDICT: no meaningful throttling. Clocks held up under load.'
+        }
+    } else {
+        $lines += 'VERDICT: could not read processor performance counters on this system.'
+    }
+
+    $txtDiag.Text = ($lines -join [System.Environment]::NewLine)
+    Write-Log 'Thermal throttle test finished' 'OK'
+}
+
+function Invoke-DnsRace {
+    Write-Log 'DNS race: measuring real lookups against four resolvers...'
+    $txtDiag.Text = 'DNS race running, five lookups per resolver...'
+    Update-Ui
+
+    $resolvers = @(
+        @{ Name = 'Cloudflare'; Ip = '1.1.1.1' },
+        @{ Name = 'Google';     Ip = '8.8.8.8' },
+        @{ Name = 'Quad9';      Ip = '9.9.9.9' },
+        @{ Name = 'AdGuard';    Ip = '94.140.14.14' }
+    )
+    $queryName = 'www.microsoft.com'
+    $results = @()
+
+    foreach ($resolver in $resolvers) {
+        $times = @()
+        for ($i = 0; $i -lt 5; $i++) {
+            try {
+                $sw = [System.Diagnostics.Stopwatch]::StartNew()
+                Resolve-DnsName -Name $queryName -Server $resolver.Ip -Type A -DnsOnly -ErrorAction Stop | Out-Null
+                $sw.Stop()
+                $times += $sw.Elapsed.TotalMilliseconds
+            } catch { }
+        }
+        if ($times.Count -gt 0) {
+            $results += [pscustomobject]@{ Name = $resolver.Name; Ip = $resolver.Ip; Avg = ($times | Measure-Object -Average).Average; Ok = $times.Count }
+        } else {
+            $results += [pscustomobject]@{ Name = $resolver.Name; Ip = $resolver.Ip; Avg = 999999.0; Ok = 0 }
+        }
+        Update-Ui
+    }
+
+    $lines = @()
+    $lines += ('DNS RACE  five real lookups of {0}' -f $queryName)
+    $lines += '---------------------------------------------------------'
+    foreach ($row in ($results | Sort-Object Avg)) {
+        if ($row.Ok -eq 0) {
+            $lines += ('    {0,-12} ({1,-14}) no response' -f $row.Name, $row.Ip)
+        } else {
+            $lines += ('    {0,-12} ({1,-14}) {2,6:N0} ms average ({3}/5 ok)' -f $row.Name, $row.Ip, $row.Avg, $row.Ok)
+        }
+    }
+    $winner = $results | Where-Object { $_.Ok -gt 0 } | Sort-Object Avg | Select-Object -First 1
+    $lines += ''
+    if ($null -ne $winner) {
+        $lines += ('VERDICT: {0} is fastest from your line right now. The Network tab can apply it.' -f $winner.Name)
+    } else {
+        $lines += 'VERDICT: no resolver answered. Check your connection.'
+    }
+
+    $txtDiag.Text = ($lines -join [System.Environment]::NewLine)
+    Write-Log 'DNS race finished' 'OK'
+}
+
+function Update-PingTargetLabel {
+    $txtPingTargets.Text = ('Monitoring: ' + ((@($script:WorkerState.PingTargets)) -join ', '))
+}
+
+function Add-PingTarget {
+    $target = $txtPingTarget.Text.Trim()
+    if ([string]::IsNullOrWhiteSpace($target)) {
+        Write-Log 'Enter a ping target first (IP or hostname)' 'WARN'
+        return
+    }
+    if ($target -notmatch '^[A-Za-z0-9\.\-:]+$') {
+        Write-Log 'That does not look like an IP address or hostname' 'WARN'
+        return
+    }
+    $current = @($script:WorkerState.PingTargets)
+    if ($current -contains $target) {
+        Write-Log ('{0} is already being monitored' -f $target) 'WARN'
+        return
+    }
+    $script:WorkerState.PingTargets = @($current + $target)
+    Update-PingTargetLabel
+    Write-Log ('Ping target added: {0}' -f $target) 'OK'
 }
 
 function Invoke-BottleneckScan {
@@ -3704,8 +4199,62 @@ function Invoke-SystemHealthCheck {
         $lines += 'Windows image store: check failed'
     }
 
+    $lines += ''
+    $lines += 'HEALTH SCORE (transparent: minus 10 per warning, minus 20 per failure)'
+    $lines += '---------------------------------------------------------'
+
+    $checks = @()
+    try {
+        $badDisks = @(Get-PhysicalDisk -ErrorAction Stop | Where-Object { $_.HealthStatus -ne 'Healthy' })
+        $checks += @{ Name = 'Physical disks healthy'; State = $(if ($badDisks.Count -eq 0) { 'PASS' } else { 'FAIL' }) }
+    } catch { $checks += @{ Name = 'Physical disks healthy'; State = 'WARN' } }
+
+    try {
+        $lowVol = @(Get-Volume -ErrorAction Stop | Where-Object { $_.Size -gt 0 -and ($_.SizeRemaining / $_.Size) -lt 0.10 })
+        $checks += @{ Name = 'Free space above 10 percent'; State = $(if ($lowVol.Count -eq 0) { 'PASS' } else { 'WARN' }) }
+    } catch { $checks += @{ Name = 'Free space above 10 percent'; State = 'WARN' } }
+
+    try {
+        $dirtyNow = & fsutil.exe dirty query $env:SystemDrive 2>&1 | Out-String
+        $checks += @{ Name = 'System volume not dirty'; State = $(if ($dirtyNow -match 'is Dirty') { 'FAIL' } else { 'PASS' }) }
+    } catch { $checks += @{ Name = 'System volume not dirty'; State = 'WARN' } }
+
+    if ($dism -match 'no component store corruption') {
+        $checks += @{ Name = 'Windows image store clean'; State = 'PASS' }
+    } elseif ($dism -match 'repairable|corrupt') {
+        $checks += @{ Name = 'Windows image store clean'; State = 'FAIL' }
+    } else {
+        $checks += @{ Name = 'Windows image store clean'; State = 'WARN' }
+    }
+
+    try {
+        $recentBad = @(Get-WinEvent -FilterHashtable @{ LogName = 'System'; Level = 1, 2; StartTime = (Get-Date).AddHours(-24) } -ErrorAction SilentlyContinue)
+        $checks += @{ Name = 'No system errors in 24 h'; State = $(if ($recentBad.Count -eq 0) { 'PASS' } elseif ($recentBad.Count -lt 5) { 'WARN' } else { 'FAIL' }) }
+    } catch { $checks += @{ Name = 'No system errors in 24 h'; State = 'WARN' } }
+
+    try {
+        $gpuDate = (Get-CimInstance -ClassName Win32_VideoController -ErrorAction Stop | Select-Object -First 1).DriverDate
+        $gpuAge = [int]((Get-Date) - $gpuDate).TotalDays
+        $checks += @{ Name = 'GPU driver under 180 days'; State = $(if ($gpuAge -lt 180) { 'PASS' } else { 'WARN' }) }
+    } catch { $checks += @{ Name = 'GPU driver under 180 days'; State = 'WARN' } }
+
+    try {
+        $freeNow = [BaldyBeast.MemInfo]::GetFreeMemoryMb()
+        $checks += @{ Name = 'At least 1 GB RAM free'; State = $(if ($freeNow -lt 0 -or $freeNow -ge 1024) { 'PASS' } else { 'WARN' }) }
+    } catch { $checks += @{ Name = 'At least 1 GB RAM free'; State = 'WARN' } }
+
+    $score = 100
+    foreach ($check in $checks) {
+        if ($check.State -eq 'WARN') { $score -= 10 }
+        if ($check.State -eq 'FAIL') { $score -= 20 }
+        $lines += ('    {0,-32} {1}' -f $check.Name, $check.State)
+    }
+    if ($score -lt 0) { $score = 0 }
+    $lines += ''
+    $lines += ('SCORE: {0} out of 100' -f $score)
+
     $txtDiag.Text = ($lines -join [System.Environment]::NewLine)
-    Write-Log 'System health check finished' 'OK'
+    Write-Log ('System health check finished, score {0}/100' -f $score) 'OK'
 }
 
 function Start-WindowsRepair {
@@ -3781,7 +4330,9 @@ $controlNames = @(
     'chkMonitorEnable', 'sldMonitorThreshold', 'txtMonitorStatus',
     'chkTrayMode', 'chkGameDetect', 'txtPresetUrl', 'btnPresetImport',
     'txtDiag', 'chkStutterWatch', 'chkPingWatch', 'btnBottleneck', 'btnHealthCheck', 'btnDiagClear',
-    'btnRunSfc', 'btnRunDism', 'btnRunRepairBoth'
+    'btnRunSfc', 'btnRunDism', 'btnRunRepairBoth',
+    'chartLatency', 'btnEventScan', 'btnDriverReport', 'btnStorageDeep', 'btnTopHogs', 'btnTimerRes',
+    'btnThrottleTest', 'btnDnsRace', 'txtPingTarget', 'btnPingAdd', 'txtPingTargets'
 )
 
 $missingNames = @()
@@ -3856,9 +4407,13 @@ Tray, profiles and convenience:
 
 Diagnostics:
   The Diagnostics tab watches for stutter risk (driver latency, disk queue,
-  low memory), tracks packet loss and ping spikes, scans for bottlenecks,
-  checks storage health, temperatures and the Windows image store, and runs
-  sfc /scannow and DISM RestoreHealth in their own windows.
+  low memory), tracks packet loss and ping spikes on a live latency chart,
+  scans for bottlenecks, checks storage health, temperatures and the Windows
+  image store, and runs sfc /scannow and DISM RestoreHealth in their own
+  windows. Deep reports cover Windows event log forensics (display driver
+  resets, disk errors, crash events), driver age, disk SMART data, top resource
+  users and timer resolution. Tests include a thermal throttle test and a DNS
+  race, plus custom ping targets for your own game servers.
 
 One line install from GitHub:
   irm "$($script:RepoRawUrl)" | iex
@@ -4156,6 +4711,19 @@ $btnRunRepairBoth.Add_Click({
     }
 })
 
+$btnEventScan.Add_Click({ Scan-EventLogs })
+$btnDriverReport.Add_Click({ Show-DriverReport })
+$btnStorageDeep.Add_Click({ Show-SmartReport })
+$btnTopHogs.Add_Click({ Show-TopHogs })
+$btnTimerRes.Add_Click({ Show-TimerResolution })
+$btnThrottleTest.Add_Click({
+    if (Confirm-Action 'Thermal throttle test' 'Run all CPU cores at full load for 20 seconds to check for throttling? The fans will spin up. Safe, just loud.') {
+        Invoke-ThrottleTest
+    }
+})
+$btnDnsRace.Add_Click({ Invoke-DnsRace })
+$btnPingAdd.Add_Click({ Add-PingTarget })
+
 $window.Add_StateChanged({ Handle-WindowState })
 $window.Add_Closed({
     if ($null -ne $script:TrayIcon) {
@@ -4398,6 +4966,48 @@ if ($script:ValidateMode) {
     } catch {
         Write-Host ('DEFAULT VALUE TEST FAILED: {0}' -f $_.Exception.Message) -ForegroundColor Red
         Remove-Item -Path 'HKCU:\Software\BaldyBeastValidateTestDefault' -Recurse -Force -ErrorAction SilentlyContinue
+    }
+
+    # v1.9 smoke tests: read-only diagnostics must produce their reports
+    try {
+        Show-TimerResolution
+        if ($txtDiag.Text -match 'TIMER RESOLUTION') {
+            Write-Host 'DIAG TIMER TEST OK' -ForegroundColor Green
+        } else {
+            Write-Host 'DIAG TIMER TEST FAILED - no report produced' -ForegroundColor Red
+        }
+    } catch {
+        Write-Host ('DIAG TIMER TEST FAILED: {0}' -f $_.Exception.Message) -ForegroundColor Red
+    }
+    try {
+        Show-DriverReport
+        if ($txtDiag.Text -match 'DRIVER AGE REPORT') {
+            Write-Host 'DIAG DRIVERS TEST OK' -ForegroundColor Green
+        } else {
+            Write-Host 'DIAG DRIVERS TEST FAILED - no report produced' -ForegroundColor Red
+        }
+    } catch {
+        Write-Host ('DIAG DRIVERS TEST FAILED: {0}' -f $_.Exception.Message) -ForegroundColor Red
+    }
+    try {
+        Scan-EventLogs
+        if ($txtDiag.Text -match 'EVENT LOG SCAN') {
+            Write-Host 'DIAG EVENTS TEST OK' -ForegroundColor Green
+        } else {
+            Write-Host 'DIAG EVENTS TEST FAILED - no report produced' -ForegroundColor Red
+        }
+    } catch {
+        Write-Host ('DIAG EVENTS TEST FAILED: {0}' -f $_.Exception.Message) -ForegroundColor Red
+    }
+    try {
+        $script:WorkerState.LatencyHistory.Clear()
+        [void]$script:WorkerState.LatencyHistory.Add(12)
+        [void]$script:WorkerState.LatencyHistory.Add(-1)
+        [void]$script:WorkerState.LatencyHistory.Add(20)
+        Draw-LatencyChart
+        Write-Host 'CHART TEST OK' -ForegroundColor Green
+    } catch {
+        Write-Host ('CHART TEST FAILED: {0}' -f $_.Exception.Message) -ForegroundColor Red
     }
 
     # Standby purge smoke test: exercises the interop end to end. Non-elevated

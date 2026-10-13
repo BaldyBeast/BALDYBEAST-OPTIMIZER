@@ -31,6 +31,28 @@ Or clone the repo and run the file directly:
 powershell -ExecutionPolicy Bypass -File Optimize.ps1
 ```
 
+## What's new in v1.9
+
+- **Event log forensics**: scans 48 hours of System and Application logs for
+  the classic failure signatures (display driver TDR resets, disk and file
+  system errors, unexpected shutdowns and bugchecks, app crashes, out of
+  memory events) and writes a verdict.
+- **Driver age report**: GPU, audio and network driver versions and dates with
+  VERY OLD flags past a year.
+- **Disk SMART and latency**: temperature, wear, power-on hours, read/write
+  error totals plus live per-disk read and write latency in milliseconds.
+- **Top resource users**: live top 5 by CPU and RAM, sampled over 2 seconds.
+- **Timer resolution display** (current, finest, coarsest).
+- **Latency chart**: the packet loss monitor now plots its last 90 samples as
+  a live WPF chart with red marks on lost packets.
+- **Thermal throttle test**: 20 seconds of full CPU load while watching
+  processor performance, verdict on whether clocks collapsed.
+- **DNS race**: measures real lookups against Cloudflare, Google, Quad9 and
+  AdGuard and names the fastest from your line.
+- **Custom ping targets**: add your game server IPs to the packet loss monitor.
+- **Health score**: the system health check now ends with an itemized
+  PASS/WARN/FAIL list and a transparent score out of 100.
+
 ## What's new in v1.8
 
 - **Snappy GUI**: all monitoring (memory sampling, performance counters, pings,
