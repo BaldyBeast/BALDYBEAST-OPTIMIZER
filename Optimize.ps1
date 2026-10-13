@@ -12,7 +12,7 @@
 
 $ErrorActionPreference = 'Continue'
 
-$script:AppVersion   = '1.3.1'
+$script:AppVersion   = '1.4.0'
 $script:RepoRawUrl   = 'https://raw.githubusercontent.com/BaldyBeast/BALDYBEAST-OPTIMIZER/main/Optimize.ps1'
 $script:LogFile      = Join-Path $env:TEMP 'BaldyBeast-Optimizer.log'
 $script:LogBox       = $null
@@ -406,9 +406,12 @@ $xamlA = @'
         </StackPanel>
       </StackPanel>
       <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-        <Button x:Name="btnRestorePoint" Style="{StaticResource DarkButton}" Content="Create Restore Point" Margin="0,0,8,0"/>
-        <Button x:Name="btnReboot" Style="{StaticResource DarkButton}" Content="Restart PC" Margin="0,0,8,0"/>
-        <Button x:Name="btnOptimizeAll" Style="{StaticResource AccentButton}" Content="Optimize Everything (Gaming Ready)"/>
+        <Button x:Name="btnRestorePoint" Style="{StaticResource DarkButton}" Content="Create Restore Point" Margin="0,0,8,0"
+                ToolTip="Creates a Windows System Restore point before you change anything. Recommended first step."/>
+        <Button x:Name="btnReboot" Style="{StaticResource DarkButton}" Content="Restart PC" Margin="0,0,8,0"
+                ToolTip="Restarts the PC so HAGS and power plan changes take effect."/>
+        <Button x:Name="btnOptimizeAll" Style="{StaticResource AccentButton}" Content="Optimize Everything (Gaming Ready)"
+                ToolTip="Ticks the recommended gaming and debloat options and applies them in one batch."/>
       </StackPanel>
     </Grid>
 
@@ -551,6 +554,16 @@ $xamlB = @'
 
             <Border Style="{StaticResource Card}">
               <StackPanel>
+                <TextBlock Style="{StaticResource CardHeader}" Text="Windows Recall Snapshots (privacy)"/>
+                <TextBlock Style="{StaticResource DimText}"
+                           Text="Deletes snapshot data Recall already captured on this PC. The Debloat tab has the toggle that stops new snapshots from being taken."/>
+                <Button x:Name="btnWipeRecall" Style="{StaticResource DangerButton}" Content="Delete Recall Snapshot Data"
+                        HorizontalAlignment="Left"/>
+              </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource Card}">
+              <StackPanel>
                 <TextBlock Style="{StaticResource CardHeader}" Text="File Cleanup"/>
                 <TextBlock Style="{StaticResource DimText}"
                            Text="Each button logs how much space it freed. Nothing here touches personal files."/>
@@ -672,6 +685,20 @@ $xamlB = @'
                   <Button x:Name="btnRevertBackup" Style="{StaticResource DangerButton}" Content="Revert Selected Backup" Margin="0,0,8,0"/>
                   <Button x:Name="btnRefreshBackups" Style="{StaticResource DarkButton}" Content="Refresh List" Margin="0,0,8,0"/>
                   <Button x:Name="btnOpenBackupFolder" Style="{StaticResource DarkButton}" Content="Open Backup Folder"/>
+                </StackPanel>
+              </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource Card}">
+              <StackPanel>
+                <TextBlock Style="{StaticResource CardHeader}" Text="Windows System Restore Points"/>
+                <TextBlock Style="{StaticResource DimText}"
+                           Text="The full Windows safety net. Restoring rolls back system files, drivers and registry to that moment and restarts the PC. Use the rollback points above for single tweaks, this one for big changes."/>
+                <ListBox x:Name="listRestorePoints" Height="140" Background="#FF0D0D14" Foreground="#FFE8E8F0"
+                         BorderBrush="#FF3A3A52" FontFamily="Consolas" FontSize="12"/>
+                <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                  <Button x:Name="btnRestorePointGo" Style="{StaticResource DangerButton}" Content="Restore PC to Selected Point" Margin="0,0,8,0"/>
+                  <Button x:Name="btnRestorePointRefresh" Style="{StaticResource DarkButton}" Content="Refresh List"/>
                 </StackPanel>
               </StackPanel>
             </Border>
@@ -2522,6 +2549,102 @@ function Invoke-RecommendedTweaks {
 }
 
 # ----------------------------------------------------------------------------
+# Windows System Restore points, build awareness, Recall snapshot wipe
+# ----------------------------------------------------------------------------
+function Update-RestorePointList {
+    if ($null -eq $listRestorePoints) { return }
+    $listRestorePoints.Items.Clear()
+    try {
+        $points = @(Get-ComputerRestorePoint -ErrorAction Stop)
+        foreach ($point in $points) {
+            $created = $point.CreationTime
+            if ($created -is [string]) {
+                try {
+                    $created = [System.Management.ManagementDateTimeConverter]::ToDateTime($created)
+                } catch {
+                    $created = $null
+                }
+            }
+            $stamp = 'unknown time'
+            if ($null -ne $created) { $stamp = $created.ToString('yyyy-MM-dd HH:mm') }
+
+            $item = New-Object System.Windows.Controls.ListBoxItem
+            $item.Content = ('{0}   seq {1}   {2}' -f $stamp, $point.SequenceNumber, $point.Description)
+            $item.Tag = [int]$point.SequenceNumber
+            [void]$listRestorePoints.Items.Add($item)
+        }
+        Write-Log ('Windows restore points found: {0}' -f $listRestorePoints.Items.Count)
+    } catch {
+        Write-Log ('Restore point list unavailable: {0}' -f $_.Exception.Message) 'WARN'
+    }
+}
+
+function Restore-ComputerToPoint {
+    param([Parameter(Mandatory = $true)][int]$SequenceNumber)
+
+    Write-Log ('Starting System Restore to restore point seq {0}...' -f $SequenceNumber) 'WARN'
+    try {
+        Restore-Computer -RestorePoint $SequenceNumber -Confirm:$false -ErrorAction Stop
+    } catch {
+        Write-Log ('System Restore failed: {0}' -f $_.Exception.Message) 'ERROR'
+    }
+}
+
+function Set-TweakAvailability {
+    $build = 0
+    try {
+        $build = [int]((Get-CimInstance -ClassName Win32_OperatingSystem -ErrorAction Stop).BuildNumber)
+    } catch {
+        return
+    }
+
+    $isWin11 = ($build -ge 22000)
+    $is24H2  = ($build -ge 26100)
+
+    $rules = @(
+        @{ Name = 'chkClassicMenu'; Require = $isWin11; Reason = 'this is a Windows 11 only setting' },
+        @{ Name = 'chkCopilot';     Require = $isWin11; Reason = 'Copilot does not exist on Windows 10' },
+        @{ Name = 'chkRecall';      Require = $is24H2;  Reason = 'Recall needs Windows 11 version 24H2 or newer' },
+        @{ Name = 'chkTaskbarLeft'; Require = $isWin11; Reason = 'Windows 10 already has a left aligned taskbar' }
+    )
+
+    $disabled = 0
+    foreach ($rule in $rules) {
+        $control = $script:Window.FindName($rule.Name)
+        if ($null -eq $control) { continue }
+        if (-not $rule.Require) {
+            $control.IsChecked = $false
+            $control.IsEnabled = $false
+            $control.ToolTip = ('Not applicable on this system: {0}' -f $rule.Reason)
+            $disabled++
+        }
+    }
+
+    if ($disabled -gt 0) {
+        Write-Log ('{0} options greyed out because they do not apply to this Windows build ({1})' -f $disabled, $build) 'INFO'
+    }
+}
+
+function Remove-RecallSnapshots {
+    Write-Log 'Deleting Windows Recall snapshot data...'
+    try {
+        $aiDirs = @(Get-ChildItem -Path $env:LOCALAPPDATA -Directory -Filter 'CoreAIPlatform*' -ErrorAction SilentlyContinue)
+        if ($aiDirs.Count -eq 0) {
+            Write-Log 'No Recall snapshot storage found. Recall may never have run on this PC.' 'INFO'
+            return
+        }
+
+        foreach ($dir in $aiDirs) {
+            Get-ChildItem -LiteralPath $dir.FullName -Force -ErrorAction SilentlyContinue |
+                Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+            Write-Log ('Cleared Recall storage: {0}' -f $dir.Name) 'OK'
+        }
+    } catch {
+        Write-Log ('Recall cleanup failed: {0}' -f $_.Exception.Message) 'ERROR'
+    }
+}
+
+# ----------------------------------------------------------------------------
 # Build the WPF window
 # ----------------------------------------------------------------------------
 Add-Type -AssemblyName PresentationFramework
@@ -2568,7 +2691,8 @@ $controlNames = @(
     'txtBenchmark', 'btnBenchRun', 'btnBenchSave', 'btnBenchCompare', 'btnBenchOpen',
     'btnExportBundle', 'btnMakeShortcut', 'chkClassicMenu',
     'txtMemory', 'btnPurgeStandby', 'btnMemoryRefresh', 'btnPurgeStandbyQuick',
-    'chkTaskbarLeft', 'chkTaskbarSearch', 'chkTaskbarTaskView', 'btnApplyRecommended', 'btnOpenDisplay'
+    'chkTaskbarLeft', 'chkTaskbarSearch', 'chkTaskbarTaskView', 'btnApplyRecommended', 'btnOpenDisplay',
+    'listRestorePoints', 'btnRestorePointGo', 'btnRestorePointRefresh', 'btnWipeRecall'
 )
 
 $missingNames = @()
@@ -2623,6 +2747,11 @@ Support:
   The About tab exports a support bundle (hardware, tweaks, benchmark, log) for
   GitHub issues and creates a Desktop shortcut so you never need the one-liner
   again.
+
+Safety and compatibility:
+  The Backups tab lists Windows System Restore points and can restore the whole
+  PC to any of them. Options that do not apply to your Windows build are greyed
+  out automatically. The Clean tab can delete Windows Recall snapshot data.
 
 One line install from GitHub:
   irm "$($script:RepoRawUrl)" | iex
@@ -2844,6 +2973,25 @@ $btnOpenDisplay.Add_Click({
     }
 })
 
+$btnRestorePointRefresh.Add_Click({ Update-RestorePointList })
+$btnRestorePointGo.Add_Click({
+    if ($null -eq $listRestorePoints.SelectedItem) {
+        Write-Log 'Select a restore point in the list first' 'WARN'
+        return
+    }
+    $seq = [int]$listRestorePoints.SelectedItem.Tag
+    $question = 'Restore the whole PC to restore point seq {0}?' -f $seq
+    $question += ' This restarts the computer and rolls back system files, drivers and registry to that moment. Personal files are not affected.'
+    if (Confirm-Action 'System Restore' $question) {
+        Restore-ComputerToPoint -SequenceNumber $seq
+    }
+})
+$btnWipeRecall.Add_Click({
+    if (Confirm-Action 'Delete Recall snapshots' 'Delete all Windows Recall snapshot data on this PC? This cannot be undone, but Recall stays disabled while the Debloat toggle is applied.') {
+        Remove-RecallSnapshots
+    }
+})
+
 # ----------------------------------------------------------------------------
 # Startup log
 # ----------------------------------------------------------------------------
@@ -2919,10 +3067,12 @@ try {
     [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
 } catch { }
 
+Set-TweakAvailability
 Update-HardwareInfo
 Update-MemoryInfo
 Update-ProfileList
 Update-BackupList
+Update-RestorePointList
 Update-StartupList
 $txtNetwork.Text = ((Get-NetworkSummary) -join [System.Environment]::NewLine)
 Test-ForUpdate

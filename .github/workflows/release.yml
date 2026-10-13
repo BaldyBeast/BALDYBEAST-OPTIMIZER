@@ -1,0 +1,38 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build release asset
+        shell: powershell
+        run: |
+          $versionMatch = [regex]::Match((Get-Content .\Optimize.ps1 -Raw), "AppVersion\s*=\s*'([0-9\.]+)'")
+          if (-not $versionMatch.Success) {
+            Write-Error 'Could not read AppVersion from Optimize.ps1'
+            exit 1
+          }
+          $version = $versionMatch.Groups[1].Value
+          if ('${{ github.ref_name }}' -ne ('v' + $version)) {
+            Write-Error ("Tag {0} does not match script version v{1}. Bump AppVersion or fix the tag." -f '${{ github.ref_name }}', $version)
+            exit 1
+          }
+          powershell -NoProfile -ExecutionPolicy Bypass -File .\winget\build-release.ps1
+          $sha = (Get-FileHash .\dist\BaldyBeast.Optimizer-win.zip -Algorithm SHA256).Hash
+          "Release v$version SHA256: ``$sha``" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/BaldyBeast.Optimizer-win.zip
+          generate_release_notes: true

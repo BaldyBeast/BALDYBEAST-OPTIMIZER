@@ -1,0 +1,69 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run validation harness
+        shell: powershell
+        run: |
+          $env:BALDYBEAST_VALIDATE = '1'
+          $env:BALDYBEAST_RENDER = '1'
+          $all = & powershell -NoProfile -ExecutionPolicy Bypass -File .\Optimize.ps1 2>&1 | ForEach-Object { "$_" }
+          $all | Tee-Object -FilePath harness.log
+          $failPatterns = 'SELF-TEST FAILED|ROLLBACK TEST FAILED|PROFILE TEST FAILED|STARTUP TEST FAILED|NETWORK TEST FAILED|BENCHMARK TEST FAILED|MEMORY TEST FAILED|DEFAULT VALUE TEST FAILED|PURGE SMOKE FAILED|VALIDATION FAILED'
+          if (@($all | Select-String -Pattern $failPatterns).Count -gt 0) {
+            Write-Error 'Harness reported test failures'
+            exit 1
+          }
+          if (@($all | Select-String -Pattern 'VALIDATION OK').Count -eq 0) {
+            Write-Error 'Harness did not reach VALIDATION OK'
+            exit 1
+          }
+          Write-Host 'Harness passed.'
+
+      - name: Collect UI renders
+        if: always()
+        shell: powershell
+        run: |
+          if (Test-Path "$env:TEMP\bb-ui") {
+            Copy-Item "$env:TEMP\bb-ui" -Destination .\ui-renders -Recurse -Force
+          }
+
+      - name: Upload UI renders
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-renders
+          path: ui-renders/
+          if-no-files-found: ignore
+
+      - name: Upload harness log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: harness-log
+          path: harness.log
+          if-no-files-found: ignore
+
+      - name: PSScriptAnalyzer
+        shell: powershell
+        run: |
+          Install-Module PSScriptAnalyzer -Force -Scope CurrentUser -SkipPublisherCheck
+          $results = Invoke-ScriptAnalyzer -Path .\Optimize.ps1 -Severity Error,Warning
+          $results | Format-Table -AutoSize | Out-String | Write-Host
+          $errors = @($results | Where-Object { $_.Severity -eq 'Error' })
+          if ($errors.Count -gt 0) {
+            Write-Error ("PSScriptAnalyzer found {0} errors" -f $errors.Count)
+            exit 1
+          }
+          $warnings = @($results | Where-Object { $_.Severity -eq 'Warning' }).Count
+          Write-Host ("PSScriptAnalyzer: 0 errors, {0} warnings" -f $warnings)

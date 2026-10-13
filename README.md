@@ -26,6 +26,22 @@ Or clone the repo and run the file directly:
 powershell -ExecutionPolicy Bypass -File Optimize.ps1
 ```
 
+## What's new in v1.4
+
+- **Continuous integration**: every push runs the full validation harness (10
+  tests), PSScriptAnalyzer and the UI render pass on GitHub Actions, and uploads
+  the tab screenshots as build artifacts. Nothing broken reaches users.
+- **Automated releases**: pushing a `v*` tag builds the release zip with its
+  SHA256 and publishes it as a GitHub Release, ready for winget submission.
+- **Windows System Restore, in the Backups tab**: lists every restore point and
+  can restore the whole PC to any of them with one click.
+- **Build awareness**: options that do not apply to your Windows build (Windows
+  11 only tweaks on Windows 10, Recall before 24H2) are greyed out automatically
+  with a tooltip explaining why.
+- **Recall snapshot wipe**: the Clean tab now deletes Windows Recall snapshot
+  data that was already captured.
+- **Polish**: tooltips on the header buttons, clearer safety wording everywhere.
+
 ## What's new in v1.3.1
 
 - **Fixed**: Purge Standby List failed with status 0xC000000D on some systems.
