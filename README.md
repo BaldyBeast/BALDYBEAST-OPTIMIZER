@@ -26,6 +26,16 @@ Or clone the repo and run the file directly:
 powershell -ExecutionPolicy Bypass -File Optimize.ps1
 ```
 
+## What's new in v1.3.1
+
+- **Fixed**: Purge Standby List failed with status 0xC000000D on some systems.
+  The memory list command value now covers both API enum conventions.
+- **Fixed**: "Download and Restart" looked broken because it was greyed out when
+  no update existed. It is always available now and doubles as a repair.
+- **Better layout**: tabs fit on one row, taller window, action buttons moved to
+  the top of the About tab, and a Purge Standby List button added to the Clean
+  tab where the cleanup tools live. The window title now shows the version.
+
 ## What's new in v1.3
 
 - **Benchmark tab**: CPU single and multi thread, memory copy and disk tests in
@@ -70,7 +80,7 @@ powershell -ExecutionPolicy Bypass -File Optimize.ps1
 
 ## What you get
 
-**Gaming Tweaks tab**
+**Gaming tab**
 - Ultimate Performance power plan (falls back to High Performance)
 - Mouse acceleration off (Enhance Pointer Precision disabled and applied instantly)
 - Game DVR and background recording disabled (GameConfigStore + AppCaptureEnabled + policy)
@@ -81,7 +91,7 @@ powershell -ExecutionPolicy Bypass -File Optimize.ps1
 - USB selective suspend off
 - Visual effects set for best performance
 
-**Debloat and Services tab**
+**Debloat tab**
 - Bloatware removal per category (Bing apps, 3D apps, Solitaire and Xbox companion, consumer apps, Cortana)
 - Telemetry, DiagTrack and CEIP scheduled tasks disabled
 - Unneeded services disabled (Maps Broker, Retail Demo, WMP Network Sharing)
@@ -92,7 +102,7 @@ powershell -ExecutionPolicy Bypass -File Optimize.ps1
 - OneDrive autostart entry removed (files untouched)
 - Classic Windows 11 right-click menu toggle
 
-**System Clean tab**
+**Clean tab**
 - Temp files, Windows Update cache, prefetch, Delivery Optimization cache, error reports
 - Recycle Bin, DNS cache
 - Full cleanup in one click

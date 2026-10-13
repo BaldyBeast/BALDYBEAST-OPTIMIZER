@@ -12,7 +12,7 @@
 
 $ErrorActionPreference = 'Continue'
 
-$script:AppVersion   = '1.3.0'
+$script:AppVersion   = '1.3.1'
 $script:RepoRawUrl   = 'https://raw.githubusercontent.com/BaldyBeast/BALDYBEAST-OPTIMIZER/main/Optimize.ps1'
 $script:LogFile      = Join-Path $env:TEMP 'BaldyBeast-Optimizer.log'
 $script:LogBox       = $null
@@ -255,8 +255,8 @@ function Clear-PathSafe {
 $xamlA = @'
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="BALDYBEAST OPTIMIZER" Height="800" Width="1140"
-        MinHeight="660" MinWidth="960" WindowStartupLocation="CenterScreen"
+        Title="BALDYBEAST OPTIMIZER" Height="860" Width="1140"
+        MinHeight="700" MinWidth="960" WindowStartupLocation="CenterScreen"
         Background="#FF14141F" Foreground="#FFE8E8F0"
         FontFamily="Segoe UI" FontSize="13">
   <Window.Resources>
@@ -354,11 +354,12 @@ $xamlA = @'
     </Style>
 
     <Style TargetType="TabItem" x:Key="DarkTab">
+      <Setter Property="FontSize" Value="12"/>
       <Setter Property="Template">
         <Setter.Value>
           <ControlTemplate TargetType="TabItem">
             <Border x:Name="tabBd" Background="Transparent" BorderBrush="#FF3A3A52"
-                    BorderThickness="1,1,1,0" CornerRadius="8,8,0,0" Margin="0,0,6,0" Padding="16,9">
+                    BorderThickness="1,1,1,0" CornerRadius="8,8,0,0" Margin="0,0,4,0" Padding="12,8">
               <ContentPresenter x:Name="headerHost" ContentSource="Header" TextElement.Foreground="#FFB8B8CC"/>
             </Border>
             <ControlTemplate.Triggers>
@@ -413,10 +414,10 @@ $xamlA = @'
 
     <!-- Tabs -->
     <TabControl x:Name="tabMain" Grid.Row="2" Margin="18,8,18,0" Background="#FF1F1F2E"
-                BorderBrush="#FF3A3A52" Padding="10">
+                BorderBrush="#FF3A3A52" Padding="6">
 
       <!-- ================= GAMING TWEAKS ================= -->
-      <TabItem Header="Gaming Tweaks" Style="{StaticResource DarkTab}">
+      <TabItem Header="Gaming" Style="{StaticResource DarkTab}">
         <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="4">
           <StackPanel>
             <Border Style="{StaticResource Card}">
@@ -469,7 +470,7 @@ $xamlA = @'
 # ----------------------------------------------------------------------------
 $xamlB = @'
       <!-- ================= DEBLOAT AND SERVICES ================= -->
-      <TabItem Header="Debloat and Services" Style="{StaticResource DarkTab}">
+      <TabItem Header="Debloat" Style="{StaticResource DarkTab}">
         <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="4">
           <StackPanel>
             <Border Style="{StaticResource Card}">
@@ -535,9 +536,19 @@ $xamlB = @'
       </TabItem>
 
       <!-- ================= SYSTEM CLEAN ================= -->
-      <TabItem Header="System Clean" Style="{StaticResource DarkTab}">
+      <TabItem Header="Clean" Style="{StaticResource DarkTab}">
         <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="4">
           <StackPanel>
+            <Border Style="{StaticResource Card}">
+              <StackPanel>
+                <TextBlock Style="{StaticResource CardHeader}" Text="RAM Cache (standby list)"/>
+                <TextBlock Style="{StaticResource DimText}"
+                           Text="Releases file data Windows keeps cached in RAM. Useful right before launching a game so it gets clean memory instantly. Full memory breakdown lives in the Hardware tab."/>
+                <Button x:Name="btnPurgeStandbyQuick" Style="{StaticResource DangerButton}" Content="Purge Standby List"
+                        HorizontalAlignment="Left"/>
+              </StackPanel>
+            </Border>
+
             <Border Style="{StaticResource Card}">
               <StackPanel>
                 <TextBlock Style="{StaticResource CardHeader}" Text="File Cleanup"/>
@@ -579,7 +590,7 @@ $xamlB = @'
                 <TextBlock Style="{StaticResource CardHeader}" Text="System Information"/>
                 <TextBox x:Name="txtHardware" IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap"
                          FontFamily="Consolas" FontSize="12.5" Background="#FF0D0D14" Foreground="#FFB8D8F0"
-                         BorderBrush="#FF3A3A52" Padding="10" MinHeight="270"
+                         BorderBrush="#FF3A3A52" Padding="10" MinHeight="220"
                          VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"/>
                 <Button x:Name="btnRefreshHw" Style="{StaticResource DarkButton}" Content="Refresh"
                         HorizontalAlignment="Left" Margin="0,10,0,0"/>
@@ -796,16 +807,17 @@ $xamlB = @'
             <Border Style="{StaticResource Card}">
               <StackPanel>
                 <TextBlock Style="{StaticResource CardHeader}" Text="BALDYBEAST OPTIMIZER"/>
-                <TextBlock x:Name="txtAbout" TextWrapping="Wrap" Foreground="#FFD0D0E0" FontSize="13" LineHeight="23"/>
-                <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
                   <Button x:Name="btnCheckUpdate" Style="{StaticResource DarkButton}" Content="Check for Updates" Margin="0,0,8,0"/>
-                  <Button x:Name="btnDoUpdate" Style="{StaticResource AccentButton}" Content="Download and Restart" IsEnabled="False"/>
+                  <Button x:Name="btnDoUpdate" Style="{StaticResource AccentButton}" Content="Download and Restart"
+                          ToolTip="Downloads the newest version from GitHub and restarts the tool. Also works as a repair if something ever breaks."/>
                 </StackPanel>
-                <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
                   <Button x:Name="btnExportBundle" Style="{StaticResource DarkButton}" Content="Export Support Bundle" Margin="0,0,8,0"/>
                   <Button x:Name="btnMakeShortcut" Style="{StaticResource DarkButton}" Content="Create Desktop Shortcut"/>
                 </StackPanel>
                 <TextBlock x:Name="txtUpdateStatus" Style="{StaticResource DimText}" Text="Update status: not checked yet"/>
+                <TextBlock x:Name="txtAbout" TextWrapping="Wrap" Foreground="#FFD0D0E0" FontSize="13" LineHeight="23" Margin="0,8,0,0"/>
               </StackPanel>
             </Border>
           </StackPanel>
@@ -1737,11 +1749,10 @@ function Test-ForUpdate {
         $running = [version]$script:AppVersion
 
         if ($script:LatestVersion -gt $running) {
-            $txtUpdateStatus.Text = ('Update status: v{0} is available (you run v{1})' -f $script:LatestVersion, $running)
-            $btnDoUpdate.IsEnabled = $true
+            $txtUpdateStatus.Text = ('Update status: v{0} is available (you run v{1}). Press Download and Restart to update.' -f $script:LatestVersion, $running)
             Write-Log ('Update available: v{0}' -f $script:LatestVersion) 'WARN'
         } else {
-            $txtUpdateStatus.Text = ('Update status: you are on the latest version (v{0})' -f $running)
+            $txtUpdateStatus.Text = ('Update status: you are on the latest version (v{0}). The button below reinstalls it if you ever need a repair.' -f $running)
             Write-Log 'Running the latest version' 'OK'
         }
     } catch {
@@ -2399,13 +2410,28 @@ public static string PurgeStandbyList()
     {
         return "AdjustTokenPrivileges failed: " + System.Runtime.InteropServices.Marshal.GetLastWin32Error();
     }
+    if (System.Runtime.InteropServices.Marshal.GetLastWin32Error() == 1300)
+    {
+        return "privilege SeProfileSingleProcessPrivilege was not assigned to this token";
+    }
 
     System.IntPtr buffer = System.Runtime.InteropServices.Marshal.AllocHGlobal(4);
     try
     {
-        System.Runtime.InteropServices.Marshal.WriteInt32(buffer, 0, 12);
-        int status = NtSetSystemInformation(80, buffer, 4);
-        return status == 0 ? "ok" : ("NtSetSystemInformation status 0x" + status.ToString("X8"));
+        // MemoryPurgeStandbyList is 4 in the WDK / ISLC enum and 12 in some
+        // reconstructed API enums. Try both, first success wins.
+        int[] commands = new int[2] { 4, 12 };
+        int status = -1;
+        for (int i = 0; i < commands.Length; i++)
+        {
+            System.Runtime.InteropServices.Marshal.WriteInt32(buffer, 0, commands[i]);
+            status = NtSetSystemInformation(80, buffer, 4);
+            if (status == 0)
+            {
+                return "ok";
+            }
+        }
+        return ("NtSetSystemInformation status 0x" + status.ToString("X8"));
     }
     finally
     {
@@ -2541,7 +2567,7 @@ $controlNames = @(
     'cmbDnsProvider', 'btnDnsApply', 'btnDnsTest', 'chkWirelessPower', 'btnWirelessPower', 'txtNetwork',
     'txtBenchmark', 'btnBenchRun', 'btnBenchSave', 'btnBenchCompare', 'btnBenchOpen',
     'btnExportBundle', 'btnMakeShortcut', 'chkClassicMenu',
-    'txtMemory', 'btnPurgeStandby', 'btnMemoryRefresh',
+    'txtMemory', 'btnPurgeStandby', 'btnMemoryRefresh', 'btnPurgeStandbyQuick',
     'chkTaskbarLeft', 'chkTaskbarSearch', 'chkTaskbarTaskView', 'btnApplyRecommended', 'btnOpenDisplay'
 )
 
@@ -2801,6 +2827,11 @@ $btnPurgeStandby.Add_Click({
         Clear-StandbyList
     }
 })
+$btnPurgeStandbyQuick.Add_Click({
+    if (Confirm-Action 'Purge Standby List' 'Release all cached file pages from RAM now? Safe to do, Windows re-caches as needed. The next app launches may be slightly slower for a few minutes.') {
+        Clear-StandbyList
+    }
+})
 $btnMemoryRefresh.Add_Click({ Update-MemoryInfo })
 
 $btnApplyRecommended.Add_Click({ Invoke-RecommendedTweaks })
@@ -2883,6 +2914,11 @@ foreach ($infoEntry in $script:TweakInfo.GetEnumerator()) {
 # ----------------------------------------------------------------------------
 # Startup initialization
 # ----------------------------------------------------------------------------
+$window.Title = ('BALDYBEAST OPTIMIZER v{0}' -f $script:AppVersion)
+try {
+    [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+} catch { }
+
 Update-HardwareInfo
 Update-MemoryInfo
 Update-ProfileList
@@ -3008,6 +3044,54 @@ if ($script:ValidateMode) {
     } catch {
         Write-Host ('DEFAULT VALUE TEST FAILED: {0}' -f $_.Exception.Message) -ForegroundColor Red
         Remove-Item -Path 'HKCU:\Software\BaldyBeastValidateTestDefault' -Recurse -Force -ErrorAction SilentlyContinue
+    }
+
+    # Standby purge smoke test: exercises the interop end to end. Non-elevated
+    # runs report a clean privilege message instead of crashing.
+    try {
+        $purgeOutcome = [BaldyBeast.Memory]::PurgeStandbyList()
+        Write-Host ('PURGE SMOKE OK - interop returned: {0}' -f $purgeOutcome) -ForegroundColor Green
+    } catch {
+        Write-Host ('PURGE SMOKE FAILED: {0}' -f $_.Exception.Message) -ForegroundColor Red
+    }
+
+    # Optional visual QA: render every tab to PNG (BALDYBEAST_RENDER=1)
+    if ($env:BALDYBEAST_RENDER -eq '1') {
+        $renderDir = Join-Path $env:TEMP 'bb-ui'
+        if (Test-Path -LiteralPath $renderDir) {
+            Remove-Item -LiteralPath $renderDir -Recurse -Force -ErrorAction SilentlyContinue
+        }
+        New-Item -Path $renderDir -ItemType Directory -Force | Out-Null
+        try {
+            $window.Width = 1140
+            $window.Height = 820
+            $window.WindowStartupLocation = 'Manual'
+            $window.Left = -4000
+            $window.Top = -4000
+            $window.Show()
+            $window.UpdateLayout()
+
+            for ($t = 0; $t -lt $tabMain.Items.Count; $t++) {
+                $tabMain.SelectedIndex = $t
+                $window.Dispatcher.Invoke([action]{}, [System.Windows.Threading.DispatcherPriority]::Render)
+                $window.UpdateLayout()
+
+                $bmp = New-Object System.Windows.Media.Imaging.RenderTargetBitmap([int]$window.ActualWidth, [int]$window.ActualHeight, 96, 96, [System.Windows.Media.PixelFormats]::Pbgra32)
+                $bmp.Render($window)
+                $encoder = New-Object System.Windows.Media.Imaging.PngBitmapEncoder
+                $encoder.Frames.Add([System.Windows.Media.Imaging.BitmapFrame]::Create($bmp))
+                $safeName = ('{0:D2}-{1}.png' -f $t, ([string]$tabMain.Items[$t].Header -replace '[^A-Za-z0-9]', ''))
+                $stream = [System.IO.File]::Create((Join-Path $renderDir $safeName))
+                $encoder.Save($stream)
+                $stream.Close()
+            }
+
+            $window.Close()
+            Write-Host ('UI RENDER OK - {0} tab images in {1}' -f $tabMain.Items.Count, $renderDir) -ForegroundColor Green
+        } catch {
+            Write-Host ('UI RENDER FAILED: {0}' -f $_.Exception.Message) -ForegroundColor Red
+            try { $window.Close() } catch { }
+        }
     }
 
     if ($missingNames.Count -gt 0) {
